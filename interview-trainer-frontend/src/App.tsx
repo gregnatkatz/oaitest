@@ -4117,6 +4117,9 @@ export default function App() {
     const [currentSubtopic, setCurrentSubtopic] = useState<string>('')
     // Use ref instead of state for synchronous updates to prevent question repetition
     const usedQuestionIdsRef = useRef<Set<string>>(new Set())
+    // Questions fetched from API (SQLite database)
+    const [questionBank, setQuestionBank] = useState<QuestionBankItem[]>([])
+    const [questionsLoading, setQuestionsLoading] = useState(true)
     const [userProgress, setUserProgress] = useState<UserProgress>({
       totalQuestionsAnswered: 0,
       currentStreak: 0,
@@ -4168,6 +4171,46 @@ export default function App() {
     }
   }, [])
 
+  // Fetch questions from API (SQLite database) on app load
+  useEffect(() => {
+    const fetchQuestions = async () => {
+      try {
+        setQuestionsLoading(true)
+        const response = await fetch(`${API_URL}/api/questions?limit=500`)
+        if (response.ok) {
+          const data = await response.json()
+          if (data.questions && Array.isArray(data.questions)) {
+            // Transform API response to match QuestionBankItem interface
+            const transformedQuestions: QuestionBankItem[] = data.questions.map((q: Record<string, unknown>) => ({
+              id: q.id as string,
+              question: q.question as string,
+              hints: (q.hints as string[]) || [],
+              expected_topics: (q.expected_topics as string[]) || [],
+              code_snippet: q.code_snippet as string | null,
+              options: (q.options as string[]) || [],
+              correct_option: q.correct_option as number,
+              blank_answer: q.blank_answer as string,
+              topic: q.topic as string,
+              subtopic: q.subtopic as string,
+              difficulty: (q.difficulty as 'beginner' | 'intermediate' | 'advanced') || 'beginner',
+              bank: (q.bank as 'easy' | 'medium' | 'hard' | 'code_review' | 'advanced') || 'easy',
+              azure_bridge: q.azure_bridge as QuestionBankItem['azure_bridge']
+            }))
+            setQuestionBank(transformedQuestions)
+            console.log(`Loaded ${transformedQuestions.length} questions from API`)
+          }
+        } else {
+          console.error('Failed to fetch questions from API')
+        }
+      } catch (error) {
+        console.error('Error fetching questions:', error)
+      } finally {
+        setQuestionsLoading(false)
+      }
+    }
+    fetchQuestions()
+  }, [])
+
   useEffect(() => {
     if (screen === 'question' && timeLeft > 0) {
       const timer = setInterval(() => {
@@ -4198,6 +4241,12 @@ export default function App() {
 
   const generateQuestion = (_type?: string, topicId?: string, subtopicId?: string) => {
     setFeedback(null)
+    
+    // Check if questions have been loaded from API
+    if (questionBank.length === 0) {
+      console.warn('Questions not yet loaded from API')
+      return
+    }
     
     const topic = topicId || currentTopic
     const subtopic = subtopicId || currentSubtopic
@@ -4232,8 +4281,8 @@ export default function App() {
     // Get available banks based on user progress (5 banks: easy, medium, hard, code_review, advanced)
     const availableBanks = getBankForProgress(userProgress)
 
-        // Use local question bank for instant loading - no API call needed
-        let availableQuestions = QUESTION_BANK.filter(q => {
+        // Use questions fetched from API (SQLite database)
+        let availableQuestions = questionBank.filter(q => {
           // Must be from an available bank based on progress
           if (!availableBanks.includes(q.bank)) return false
           if (topic && q.topic !== topic) return false
@@ -4245,7 +4294,7 @@ export default function App() {
 
         // If no topic-specific questions, use all unused questions from available banks
         if (availableQuestions.length === 0) {
-          availableQuestions = QUESTION_BANK.filter(q => 
+          availableQuestions = questionBank.filter(q => 
             availableBanks.includes(q.bank) && !usedQuestionIdsRef.current.has(q.id)
           )
         }
@@ -4253,7 +4302,7 @@ export default function App() {
         // If all questions in available banks used, reset and allow repeats (fallback for long sessions)
         if (availableQuestions.length === 0) {
           usedQuestionIdsRef.current = new Set()
-          availableQuestions = QUESTION_BANK.filter(q => availableBanks.includes(q.bank))
+          availableQuestions = questionBank.filter(q => availableBanks.includes(q.bank))
         }
 
     // ADAPTIVE LEARNING: Prioritize weak areas (70% chance to pick from weak topics if available)
@@ -4424,21 +4473,30 @@ export default function App() {
 
   return (
     <div className="font-sans">
-      {screen === 'start' && (
+      {questionsLoading && (
+        <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-orange-500 mx-auto mb-4"></div>
+            <p className="text-white text-lg">Loading questions from database...</p>
+            <p className="text-gray-400 text-sm mt-2">Preparing your training session</p>
+          </div>
+        </div>
+      )}
+      {!questionsLoading && screen === 'start' && (
         <SessionStartScreen 
           onStartSession={startSession}
           onBrowseTopics={() => setScreen('topics')}
           weakAreas={weakAreas}
         />
       )}
-      {screen === 'topics' && (
+      {!questionsLoading && screen === 'topics' && (
         <TopicPickerScreen
           onSelectTopic={handleSelectTopic}
           onBack={() => setScreen('start')}
           topicMastery={topicMastery}
         />
       )}
-      {screen === 'question' && (
+      {!questionsLoading && screen === 'question' && (
         <QuestionScreen 
           question={currentQuestion}
           questionIndex={questionIndex}

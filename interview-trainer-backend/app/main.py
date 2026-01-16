@@ -42,6 +42,7 @@ def init_db():
                 topic TEXT,
                 subtopic TEXT,
                 difficulty TEXT,
+                bank TEXT DEFAULT 'easy',
                 azure_bridge TEXT,
                 format TEXT DEFAULT 'multiple_choice',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -831,6 +832,7 @@ class QuestionBankItem(BaseModel):
     topic: str
     subtopic: str
     difficulty: str
+    bank: str = "easy"  # easy, medium, hard, code_review, advanced
     azure_bridge: Optional[dict] = None
 
 
@@ -848,8 +850,8 @@ class TopicMasteryUpdate(BaseModel):
 
 
 @app.get("/api/questions")
-async def get_questions(topic: Optional[str] = None, subtopic: Optional[str] = None, difficulty: Optional[str] = None, limit: int = 50):
-    """Get questions from the database with optional filters"""
+async def get_questions(topic: Optional[str] = None, subtopic: Optional[str] = None, difficulty: Optional[str] = None, bank: Optional[str] = None, banks: Optional[str] = None, limit: int = 50):
+    """Get questions from the database with optional filters. Use 'banks' param for comma-separated list of banks."""
     try:
         with get_db() as conn:
             cursor = conn.cursor()
@@ -865,6 +867,14 @@ async def get_questions(topic: Optional[str] = None, subtopic: Optional[str] = N
             if difficulty:
                 query += " AND difficulty = ?"
                 params.append(difficulty)
+            if bank:
+                query += " AND bank = ?"
+                params.append(bank)
+            if banks:
+                bank_list = banks.split(',')
+                placeholders = ','.join(['?' for _ in bank_list])
+                query += f" AND bank IN ({placeholders})"
+                params.extend(bank_list)
             
             query += " ORDER BY RANDOM() LIMIT ?"
             params.append(limit)
@@ -894,8 +904,8 @@ async def add_question(question: QuestionBankItem):
             cursor = conn.cursor()
             cursor.execute('''
                 INSERT OR REPLACE INTO questions 
-                (id, question, hints, expected_topics, code_snippet, options, correct_option, blank_answer, topic, subtopic, difficulty, azure_bridge)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (id, question, hints, expected_topics, code_snippet, options, correct_option, blank_answer, topic, subtopic, difficulty, bank, azure_bridge)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 question.id,
                 question.question,
@@ -908,6 +918,7 @@ async def add_question(question: QuestionBankItem):
                 question.topic,
                 question.subtopic,
                 question.difficulty,
+                question.bank,
                 json.dumps(question.azure_bridge) if question.azure_bridge else None
             ))
             conn.commit()
@@ -925,8 +936,8 @@ async def add_questions_bulk(questions: List[QuestionBankItem]):
             for question in questions:
                 cursor.execute('''
                     INSERT OR REPLACE INTO questions 
-                    (id, question, hints, expected_topics, code_snippet, options, correct_option, blank_answer, topic, subtopic, difficulty, azure_bridge)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    (id, question, hints, expected_topics, code_snippet, options, correct_option, blank_answer, topic, subtopic, difficulty, bank, azure_bridge)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ''', (
                     question.id,
                     question.question,
@@ -939,6 +950,7 @@ async def add_questions_bulk(questions: List[QuestionBankItem]):
                     question.topic,
                     question.subtopic,
                     question.difficulty,
+                    question.bank,
                     json.dumps(question.azure_bridge) if question.azure_bridge else None
                 ))
             conn.commit()
