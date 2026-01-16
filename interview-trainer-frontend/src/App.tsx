@@ -13,11 +13,17 @@ import {
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
+type QuestionFormat = 'multiple_choice' | 'fill_blank' | 'free_response' | 'voice_explain'
+
 interface Question {
   question: string
   hints: string[]
   expected_topics: string[]
   code_snippet: string | null
+  format?: QuestionFormat
+  options?: string[]
+  correct_option?: number
+  blank_answer?: string
 }
 
 interface Feedback {
@@ -48,6 +54,49 @@ interface TopicMastery {
   [topicId: string]: {
     [subtopicId: string]: { correct: number; total: number; lastPracticed: string }
   }
+}
+
+interface UserProgress {
+  totalQuestionsAnswered: number
+  currentStreak: number
+  avgScore: number
+  unlockedFormats: QuestionFormat[]
+  level: number
+}
+
+const getUnlockedFormats = (progress: UserProgress): QuestionFormat[] => {
+  const formats: QuestionFormat[] = ['multiple_choice']
+  if (progress.totalQuestionsAnswered >= 20 && progress.avgScore >= 40) {
+    formats.push('fill_blank')
+  }
+  if (progress.totalQuestionsAnswered >= 40 && progress.avgScore >= 60) {
+    formats.push('free_response')
+  }
+  if (progress.totalQuestionsAnswered >= 60 && progress.avgScore >= 70) {
+    formats.push('voice_explain')
+  }
+  return formats
+}
+
+const getQuestionFormat = (progress: UserProgress, questionIndex: number): QuestionFormat => {
+  const unlocked = getUnlockedFormats(progress)
+  if (questionIndex <= 20 || unlocked.length === 1) {
+    return 'multiple_choice'
+  }
+  if (progress.currentStreak >= 3 && unlocked.includes('fill_blank')) {
+    return Math.random() > 0.5 ? 'fill_blank' : 'multiple_choice'
+  }
+  if (progress.currentStreak >= 5 && unlocked.includes('free_response')) {
+    return Math.random() > 0.6 ? 'free_response' : 'fill_blank'
+  }
+  return unlocked[Math.floor(Math.random() * unlocked.length)]
+}
+
+const FORMAT_LABELS: Record<QuestionFormat, { label: string; color: string; icon: string }> = {
+  multiple_choice: { label: 'Multiple Choice', color: 'text-emerald-400', icon: '🔘' },
+  fill_blank: { label: 'Fill in the Blank', color: 'text-blue-400', icon: '✏️' },
+  free_response: { label: 'Free Response', color: 'text-purple-400', icon: '📝' },
+  voice_explain: { label: 'Voice Explain', color: 'text-amber-400', icon: '🎤' }
 }
 
 const TOPICS: Topic[] = [
@@ -479,7 +528,7 @@ const SessionStartScreen = ({
           <Button 
             variant="outline"
             onClick={onBrowseTopics}
-            className="flex-1 h-14 text-lg border-zinc-700 hover:border-orange-500/50 hover:bg-orange-500/10"
+            className="flex-1 h-14 text-lg bg-zinc-900 text-zinc-200 border-zinc-700 hover:border-orange-500/50 hover:bg-orange-500/10 hover:text-orange-400"
           >
             <Layers className="w-5 h-5 mr-2" />
             Browse Topics
@@ -499,22 +548,27 @@ const SessionStartScreen = ({
 
 const QuestionScreen = ({
   question, questionIndex, totalQuestions, timeLeft, sessionStats,
-  onSubmitAnswer, onNextQuestion, feedback, isLoading, onEndSession
+  onSubmitAnswer, onNextQuestion, feedback, isLoading, onEndSession, userProgress
 }: { 
   question: Question | null
   questionIndex: number
   totalQuestions: number
   timeLeft: number
   sessionStats: SessionStats
-  onSubmitAnswer: (answer: string) => void
+  onSubmitAnswer: (answer: string, selectedOption?: number) => void
   onNextQuestion: () => void
   feedback: Feedback | null
   isLoading: boolean
   onEndSession: () => void
+  userProgress: UserProgress
 }) => {
   const [userAnswer, setUserAnswer] = useState('')
+  const [selectedOption, setSelectedOption] = useState<number | null>(null)
   const [isListening, setIsListening] = useState(false)
   const [showHints, setShowHints] = useState(false)
+  
+  const questionFormat = question?.format || 'multiple_choice'
+  const formatInfo = FORMAT_LABELS[questionFormat]
 
   const toggleVoiceInput = useCallback(() => {
     if (isListening) { setIsListening(false); return }
@@ -537,8 +591,14 @@ const QuestionScreen = ({
     setIsListening(true)
   }, [isListening])
 
-  const handleSubmit = () => { if (userAnswer.trim()) onSubmitAnswer(userAnswer) }
-  const handleNext = () => { setUserAnswer(''); setShowHints(false); onNextQuestion() }
+  const handleSubmit = () => {
+    if (questionFormat === 'multiple_choice' && selectedOption !== null) {
+      onSubmitAnswer(question?.options?.[selectedOption] || '', selectedOption)
+    } else if (userAnswer.trim()) {
+      onSubmitAnswer(userAnswer)
+    }
+  }
+  const handleNext = () => { setUserAnswer(''); setSelectedOption(null); setShowHints(false); onNextQuestion() }
   const getScoreColor = (score: number) => score >= 80 ? 'text-emerald-400' : score >= 60 ? 'text-amber-400' : 'text-red-400'
 
   return (
@@ -548,7 +608,9 @@ const QuestionScreen = ({
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-4">
               <span className="text-sm text-zinc-400">Question {questionIndex} of {totalQuestions}</span>
-              <Badge className="bg-orange-500/20 text-orange-400">Session</Badge>
+              <Badge className={`${formatInfo.color} bg-transparent border-current`}>
+                {formatInfo.icon} {formatInfo.label}
+              </Badge>
             </div>
             <div className="flex items-center gap-4">
               <div className={`flex items-center gap-2 ${timeLeft < 60 ? 'text-red-400' : 'text-zinc-400'}`}>
@@ -592,14 +654,56 @@ const QuestionScreen = ({
                     )}
                     {!feedback && (
                       <>
-                        <div className="relative">
-                          <Textarea value={userAnswer} onChange={(e) => setUserAnswer(e.target.value)} placeholder="Type your answer here or use voice input..." className="min-h-32 bg-zinc-800 border-zinc-700 text-zinc-200 pr-12" />
-                          <Button variant="ghost" size="sm" className="absolute right-2 top-2" onClick={toggleVoiceInput}>
-                            {isListening ? <MicOff className="w-5 h-5 text-red-400" /> : <Mic className="w-5 h-5 text-zinc-400" />}
-                          </Button>
-                        </div>
+                        {questionFormat === 'multiple_choice' && question?.options ? (
+                          <div className="space-y-3">
+                            {question.options.map((option, idx) => (
+                              <button
+                                key={idx}
+                                onClick={() => setSelectedOption(idx)}
+                                className={`w-full p-4 rounded-xl border-2 text-left transition-all duration-200 ${
+                                  selectedOption === idx
+                                    ? 'border-orange-500 bg-orange-500/10'
+                                    : 'border-zinc-700 bg-zinc-800 hover:border-zinc-600'
+                                }`}
+                              >
+                                <div className="flex items-center gap-3">
+                                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
+                                    selectedOption === idx ? 'bg-orange-500 text-white' : 'bg-zinc-700 text-zinc-400'
+                                  }`}>
+                                    {String.fromCharCode(65 + idx)}
+                                  </div>
+                                  <span className="text-zinc-200">{option}</span>
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        ) : questionFormat === 'fill_blank' ? (
+                          <div className="space-y-4">
+                            <div className="bg-zinc-800 rounded-xl p-4 border border-zinc-700">
+                              <p className="text-zinc-400 text-sm mb-2">Fill in the blank:</p>
+                              <input
+                                type="text"
+                                value={userAnswer}
+                                onChange={(e) => setUserAnswer(e.target.value)}
+                                placeholder="Type your answer..."
+                                className="w-full bg-zinc-900 border border-zinc-600 rounded-lg px-4 py-3 text-zinc-200 focus:border-orange-500 focus:outline-none"
+                              />
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="relative">
+                            <Textarea value={userAnswer} onChange={(e) => setUserAnswer(e.target.value)} placeholder="Type your answer here or use voice input..." className="min-h-32 bg-zinc-800 border-zinc-700 text-zinc-200 pr-12" />
+                            <Button variant="ghost" size="sm" className="absolute right-2 top-2" onClick={toggleVoiceInput}>
+                              {isListening ? <MicOff className="w-5 h-5 text-red-400" /> : <Mic className="w-5 h-5 text-zinc-400" />}
+                            </Button>
+                          </div>
+                        )}
                         <div className="flex items-center gap-4 mt-4">
-                          <Button onClick={handleSubmit} disabled={isLoading || !userAnswer.trim()} className="flex-1 bg-gradient-to-r from-orange-500 to-amber-500 text-white">
+                          <Button 
+                            onClick={handleSubmit} 
+                            disabled={isLoading || (questionFormat === 'multiple_choice' ? selectedOption === null : !userAnswer.trim())} 
+                            className="flex-1 bg-gradient-to-r from-orange-500 to-amber-500 text-white"
+                          >
                             {isLoading ? 'Evaluating...' : 'Submit Answer'}
                           </Button>
                           <Button variant="ghost" onClick={() => setShowHints(!showHints)}>
@@ -676,6 +780,16 @@ const QuestionScreen = ({
                   <div className="flex items-center justify-between"><span className="text-zinc-500 text-sm">Correct</span><span className="text-emerald-400 font-semibold">{sessionStats.correct}/{sessionStats.total}</span></div>
                   <div className="flex items-center justify-between"><span className="text-zinc-500 text-sm">Streak</span><span className="text-amber-400 font-semibold">{sessionStats.streak > 0 ? `${sessionStats.streak}` : '0'}</span></div>
                   <div className="flex items-center justify-between"><span className="text-zinc-500 text-sm">Avg Score</span><span className="text-zinc-300 font-semibold">{sessionStats.total > 0 ? Math.round((sessionStats.correct / sessionStats.total) * 100) : 0}%</span></div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="bg-zinc-900 border-zinc-800">
+              <CardContent className="p-4">
+                <h3 className="text-sm font-medium text-zinc-400 mb-3">Your Progress</h3>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between"><span className="text-zinc-500 text-sm">Level</span><span className="text-orange-400 font-semibold">{userProgress.level}</span></div>
+                  <div className="flex items-center justify-between"><span className="text-zinc-500 text-sm">Total Answered</span><span className="text-zinc-300 font-semibold">{userProgress.totalQuestionsAnswered}</span></div>
+                  <div className="flex items-center justify-between"><span className="text-zinc-500 text-sm">Formats Unlocked</span><span className="text-emerald-400 font-semibold">{userProgress.unlockedFormats.length}/4</span></div>
                 </div>
               </CardContent>
             </Card>
@@ -811,8 +925,24 @@ export default function App() {
   const [topicMastery, setTopicMastery] = useState<TopicMastery>({})
   const [currentTopic, setCurrentTopic] = useState<string>('')
   const [currentSubtopic, setCurrentSubtopic] = useState<string>('')
+  const [userProgress, setUserProgress] = useState<UserProgress>({
+    totalQuestionsAnswered: 0,
+    currentStreak: 0,
+    avgScore: 0,
+    unlockedFormats: ['multiple_choice'],
+    level: 1
+  })
 
   useEffect(() => {
+    const savedProgress = localStorage.getItem('userProgress')
+    if (savedProgress) {
+      try {
+        setUserProgress(JSON.parse(savedProgress))
+      } catch (e) {
+        console.error('Failed to parse user progress:', e)
+      }
+    }
+
     const savedMastery = localStorage.getItem('topicMastery')
     if (savedMastery) {
       try {
@@ -880,6 +1010,8 @@ export default function App() {
     const subtopic = subtopicId || currentSubtopic
     const topicName = TOPICS.find(t => t.id === topic)?.name || ''
     const subtopicName = TOPICS.find(t => t.id === topic)?.subtopics.find(s => s.id === subtopic)?.name || ''
+    
+    const format = getQuestionFormat(userProgress, questionIndex + 1)
 
     try {
       const response = await fetch(`${API_URL}/api/question`, {
@@ -888,10 +1020,25 @@ export default function App() {
         body: JSON.stringify({
           category: subtopicName || topicName || '',
           difficulty: 'medium',
-          interview_type: type || sessionType
+          interview_type: type || sessionType,
+          format: format
         })
       })
       const data = await response.json()
+      
+      if (format === 'multiple_choice' && !data.options) {
+        const correctAnswer = data.correct_answer || data.expected_topics?.[0] || 'Correct answer'
+        const wrongAnswers = [
+          'This is not the correct approach',
+          'This option is incorrect',
+          'This is a common misconception'
+        ]
+        const allOptions = [correctAnswer, ...wrongAnswers].sort(() => Math.random() - 0.5)
+        data.options = allOptions
+        data.correct_option = allOptions.indexOf(correctAnswer)
+      }
+      
+      data.format = format
       setCurrentQuestion(data)
       setQuestionIndex(prev => prev + 1)
     } catch (error) {
@@ -936,6 +1083,22 @@ export default function App() {
       if (currentTopic && currentSubtopic) {
         updateTopicMastery(currentTopic, currentSubtopic, isCorrect)
       }
+      
+      setUserProgress(prev => {
+        const newTotal = prev.totalQuestionsAnswered + 1
+        const newAvg = Math.round((prev.avgScore * prev.totalQuestionsAnswered + data.score) / newTotal)
+        const newStreak = isCorrect ? prev.currentStreak + 1 : 0
+        const updated = {
+          ...prev,
+          totalQuestionsAnswered: newTotal,
+          currentStreak: newStreak,
+          avgScore: newAvg,
+          unlockedFormats: getUnlockedFormats({ ...prev, totalQuestionsAnswered: newTotal, avgScore: newAvg }),
+          level: Math.floor(newTotal / 20) + 1
+        }
+        localStorage.setItem('userProgress', JSON.stringify(updated))
+        return updated
+      })
     } catch (error) {
       console.error('Failed to evaluate answer:', error)
     } finally {
@@ -1014,6 +1177,7 @@ export default function App() {
           feedback={feedback}
           isLoading={isLoading}
           onEndSession={endSession}
+          userProgress={userProgress}
         />
       )}
       {screen === 'summary' && (
