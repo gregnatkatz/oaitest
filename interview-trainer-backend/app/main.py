@@ -6,8 +6,91 @@ from openai import AzureOpenAI
 from dotenv import load_dotenv
 import os
 import json
+import sqlite3
+from datetime import datetime
+from contextlib import contextmanager
 
 load_dotenv()
+
+# SQLite Database Setup - use /data for persistent storage in production
+DB_PATH = os.getenv("DATABASE_PATH", "/data/app.db" if os.path.exists("/data") else "app.db")
+
+@contextmanager
+def get_db():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    try:
+        yield conn
+    finally:
+        conn.close()
+
+def init_db():
+    with get_db() as conn:
+        cursor = conn.cursor()
+        
+        # Questions table
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS questions (
+                id TEXT PRIMARY KEY,
+                question TEXT NOT NULL,
+                hints TEXT,
+                expected_topics TEXT,
+                code_snippet TEXT,
+                options TEXT,
+                correct_option INTEGER,
+                blank_answer TEXT,
+                topic TEXT,
+                subtopic TEXT,
+                difficulty TEXT,
+                azure_bridge TEXT,
+                format TEXT DEFAULT 'multiple_choice',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        # Answer history table for tracking user performance
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS answer_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                question_id TEXT,
+                user_answer TEXT,
+                is_correct BOOLEAN,
+                score INTEGER,
+                answered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (question_id) REFERENCES questions(id)
+            )
+        ''')
+        
+        # Spaced repetition table for SM-2 algorithm
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS spaced_repetition (
+                question_id TEXT PRIMARY KEY,
+                easiness_factor REAL DEFAULT 2.5,
+                interval INTEGER DEFAULT 1,
+                repetitions INTEGER DEFAULT 0,
+                next_review TIMESTAMP,
+                last_reviewed TIMESTAMP,
+                FOREIGN KEY (question_id) REFERENCES questions(id)
+            )
+        ''')
+        
+        # Topic mastery table
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS topic_mastery (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                topic TEXT NOT NULL,
+                subtopic TEXT,
+                correct_count INTEGER DEFAULT 0,
+                total_count INTEGER DEFAULT 0,
+                last_practiced TIMESTAMP,
+                UNIQUE(topic, subtopic)
+            )
+        ''')
+        
+        conn.commit()
+
+# Initialize database on startup
+init_db()
 
 app = FastAPI()
 
@@ -730,5 +813,275 @@ Include 3-5 practical code snippets."""
         result = json.loads(response.choices[0].message.content)
         return result
 
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============== SQLite Question Bank API Endpoints ==============
+
+class QuestionBankItem(BaseModel):
+    id: str
+    question: str
+    hints: List[str]
+    expected_topics: List[str]
+    code_snippet: Optional[str] = None
+    options: Optional[List[str]] = None
+    correct_option: Optional[int] = None
+    blank_answer: Optional[str] = None
+    topic: str
+    subtopic: str
+    difficulty: str
+    azure_bridge: Optional[dict] = None
+
+
+class AnswerHistoryItem(BaseModel):
+    question_id: str
+    user_answer: str
+    is_correct: bool
+    score: int
+
+
+class TopicMasteryUpdate(BaseModel):
+    topic: str
+    subtopic: str
+    is_correct: bool
+
+
+@app.get("/api/questions")
+async def get_questions(topic: Optional[str] = None, subtopic: Optional[str] = None, difficulty: Optional[str] = None, limit: int = 50):
+    """Get questions from the database with optional filters"""
+    try:
+        with get_db() as conn:
+            cursor = conn.cursor()
+            query = "SELECT * FROM questions WHERE 1=1"
+            params = []
+            
+            if topic:
+                query += " AND topic = ?"
+                params.append(topic)
+            if subtopic:
+                query += " AND subtopic = ?"
+                params.append(subtopic)
+            if difficulty:
+                query += " AND difficulty = ?"
+                params.append(difficulty)
+            
+            query += " ORDER BY RANDOM() LIMIT ?"
+            params.append(limit)
+            
+            cursor.execute(query, params)
+            rows = cursor.fetchall()
+            
+            questions = []
+            for row in rows:
+                q = dict(row)
+                q['hints'] = json.loads(q['hints']) if q['hints'] else []
+                q['expected_topics'] = json.loads(q['expected_topics']) if q['expected_topics'] else []
+                q['options'] = json.loads(q['options']) if q['options'] else None
+                q['azure_bridge'] = json.loads(q['azure_bridge']) if q['azure_bridge'] else None
+                questions.append(q)
+            
+            return {"questions": questions, "count": len(questions)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/questions")
+async def add_question(question: QuestionBankItem):
+    """Add a new question to the database"""
+    try:
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT OR REPLACE INTO questions 
+                (id, question, hints, expected_topics, code_snippet, options, correct_option, blank_answer, topic, subtopic, difficulty, azure_bridge)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                question.id,
+                question.question,
+                json.dumps(question.hints),
+                json.dumps(question.expected_topics),
+                question.code_snippet,
+                json.dumps(question.options) if question.options else None,
+                question.correct_option,
+                question.blank_answer,
+                question.topic,
+                question.subtopic,
+                question.difficulty,
+                json.dumps(question.azure_bridge) if question.azure_bridge else None
+            ))
+            conn.commit()
+            return {"status": "success", "id": question.id}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/questions/bulk")
+async def add_questions_bulk(questions: List[QuestionBankItem]):
+    """Add multiple questions to the database"""
+    try:
+        with get_db() as conn:
+            cursor = conn.cursor()
+            for question in questions:
+                cursor.execute('''
+                    INSERT OR REPLACE INTO questions 
+                    (id, question, hints, expected_topics, code_snippet, options, correct_option, blank_answer, topic, subtopic, difficulty, azure_bridge)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (
+                    question.id,
+                    question.question,
+                    json.dumps(question.hints),
+                    json.dumps(question.expected_topics),
+                    question.code_snippet,
+                    json.dumps(question.options) if question.options else None,
+                    question.correct_option,
+                    question.blank_answer,
+                    question.topic,
+                    question.subtopic,
+                    question.difficulty,
+                    json.dumps(question.azure_bridge) if question.azure_bridge else None
+                ))
+            conn.commit()
+            return {"status": "success", "count": len(questions)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/answer-history")
+async def record_answer(answer: AnswerHistoryItem):
+    """Record an answer in the history"""
+    try:
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO answer_history (question_id, user_answer, is_correct, score)
+                VALUES (?, ?, ?, ?)
+            ''', (answer.question_id, answer.user_answer, answer.is_correct, answer.score))
+            conn.commit()
+            return {"status": "success"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/answer-history")
+async def get_answer_history(limit: int = 100):
+    """Get recent answer history"""
+    try:
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT ah.*, q.question, q.topic, q.subtopic 
+                FROM answer_history ah
+                LEFT JOIN questions q ON ah.question_id = q.id
+                ORDER BY ah.answered_at DESC
+                LIMIT ?
+            ''', (limit,))
+            rows = cursor.fetchall()
+            return {"history": [dict(row) for row in rows]}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/topic-mastery")
+async def update_topic_mastery(update: TopicMasteryUpdate):
+    """Update topic mastery based on answer"""
+    try:
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO topic_mastery (topic, subtopic, correct_count, total_count, last_practiced)
+                VALUES (?, ?, ?, 1, ?)
+                ON CONFLICT(topic, subtopic) DO UPDATE SET
+                    correct_count = correct_count + ?,
+                    total_count = total_count + 1,
+                    last_practiced = ?
+            ''', (
+                update.topic, 
+                update.subtopic, 
+                1 if update.is_correct else 0,
+                datetime.now().isoformat(),
+                1 if update.is_correct else 0,
+                datetime.now().isoformat()
+            ))
+            conn.commit()
+            return {"status": "success"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/topic-mastery")
+async def get_topic_mastery():
+    """Get all topic mastery data"""
+    try:
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute('SELECT * FROM topic_mastery ORDER BY topic, subtopic')
+            rows = cursor.fetchall()
+            
+            mastery = {}
+            for row in rows:
+                r = dict(row)
+                topic = r['topic']
+                subtopic = r['subtopic']
+                if topic not in mastery:
+                    mastery[topic] = {}
+                mastery[topic][subtopic] = {
+                    'correct': r['correct_count'],
+                    'total': r['total_count'],
+                    'lastPracticed': r['last_practiced']
+                }
+            
+            return {"mastery": mastery}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/weak-areas")
+async def get_weak_areas():
+    """Get topics where user is struggling (< 60% accuracy with at least 3 attempts)"""
+    try:
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT topic, subtopic, correct_count, total_count,
+                       CAST(correct_count AS FLOAT) / total_count as accuracy
+                FROM topic_mastery
+                WHERE total_count >= 3
+                AND CAST(correct_count AS FLOAT) / total_count < 0.6
+                ORDER BY accuracy ASC
+            ''')
+            rows = cursor.fetchall()
+            return {"weak_areas": [dict(row) for row in rows]}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/stats")
+async def get_stats():
+    """Get overall learning statistics"""
+    try:
+        with get_db() as conn:
+            cursor = conn.cursor()
+            
+            cursor.execute('SELECT COUNT(*) as total, SUM(CASE WHEN is_correct THEN 1 ELSE 0 END) as correct FROM answer_history')
+            answer_stats = dict(cursor.fetchone())
+            
+            cursor.execute('SELECT COUNT(*) as count FROM questions')
+            question_count = cursor.fetchone()['count']
+            
+            cursor.execute('SELECT AVG(score) as avg_score FROM answer_history')
+            avg_score = cursor.fetchone()['avg_score'] or 0
+            
+            cursor.execute('SELECT COUNT(DISTINCT topic) as count FROM topic_mastery')
+            topics_practiced = cursor.fetchone()['count']
+            
+            return {
+                "total_answered": answer_stats['total'] or 0,
+                "total_correct": answer_stats['correct'] or 0,
+                "accuracy": (answer_stats['correct'] / answer_stats['total'] * 100) if answer_stats['total'] else 0,
+                "avg_score": round(avg_score, 1),
+                "questions_in_bank": question_count,
+                "topics_practiced": topics_practiced
+            }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
