@@ -13,7 +13,11 @@ import {
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
-type QuestionFormat = 'multiple_choice' | 'fill_blank' | 'free_response' | 'voice_explain'
+type QuestionFormat = 'multiple_choice' | 'fill_blank' | 'free_response' | 'voice_explain' | 'flashcard' | 'scenario' | 'teaching_moment' | 'code_recognition' | 'code_fix'
+
+type PracticeMode = 'guided' | 'independent' | 'learning'
+
+export type InterviewType = 'screening' | 'technical' | 'behavioral'
 
 interface Question {
   question: string
@@ -24,6 +28,14 @@ interface Question {
   options?: string[]
   correct_option?: number
   blank_answer?: string
+  topic?: string
+  subtopic?: string
+  azure_bridge?: {
+    openai_way: string
+    azure_equivalent: string
+    key_differences: string
+    interview_phrase: string
+  }
 }
 
 interface Feedback {
@@ -62,7 +74,331 @@ interface UserProgress {
   avgScore: number
   unlockedFormats: QuestionFormat[]
   level: number
+  practiceMode: PracticeMode
+  showAzurePerspective: boolean
 }
+
+// Spaced Repetition - SM-2 Algorithm inspired
+interface SpacedRepetitionItem {
+  questionId: string
+  easeFactor: number // 2.5 default, min 1.3
+  interval: number // days until next review
+  repetitions: number
+  nextReview: string // ISO date
+  lastScore: number
+}
+
+export interface SkillProfile {
+  [topicId: string]: {
+    level: number // 1-10
+    confidence: number // 0-100
+    questionsAnswered: number
+    avgScore: number
+    lastPracticed: string
+    weakSubtopics: string[]
+    strongSubtopics: string[]
+  }
+}
+
+// Behavioral/HR Question Bank
+interface BehavioralQuestion {
+  id: string
+  question: string
+  category: 'career_transition' | 'salary' | 'culture_fit' | 'strengths' | 'motivation' | 'conflict' | 'leadership'
+  hints: string[]
+  sampleAnswer: string
+  keyPoints: string[]
+  gregSpecific: string // Tailored for Greg's 23 years at Microsoft
+}
+
+export const BEHAVIORAL_QUESTIONS: BehavioralQuestion[] = [
+  {
+    id: 'bh-1',
+    question: 'Why are you looking to leave Microsoft after 23 years?',
+    category: 'career_transition',
+    hints: ['Focus on growth, not escape', 'Highlight what excites you about OpenAI'],
+    sampleAnswer: 'After 23 incredible years at Microsoft, I\'ve had the privilege of growing from an individual contributor to leading major initiatives. I\'ve seen the company transform multiple times. Now, I\'m drawn to OpenAI because it represents the next frontier of technology that will reshape how we work and live. I want to be at the center of that transformation, bringing my enterprise experience to help scale AI responsibly.',
+    keyPoints: ['Growth mindset', 'Positive framing', 'Specific interest in OpenAI', 'Value you bring'],
+    gregSpecific: 'Emphasize your Azure AI experience and how it directly translates to OpenAI\'s enterprise needs.'
+  },
+  {
+    id: 'bh-2',
+    question: 'What are your salary expectations?',
+    category: 'salary',
+    hints: ['Research market rates', 'Consider total compensation', 'Be flexible but know your worth'],
+    sampleAnswer: 'Based on my research and experience level, I\'m targeting a total compensation package in the range of [X-Y]. However, I\'m flexible and more focused on finding the right opportunity where I can make a significant impact. I\'d love to understand more about the role\'s scope and OpenAI\'s compensation philosophy.',
+    keyPoints: ['Research-backed range', 'Total comp focus', 'Flexibility', 'Redirect to value'],
+    gregSpecific: 'With 23 years of Microsoft experience including Azure AI, you can command senior-level compensation. Research OpenAI Glassdoor for ranges.'
+  },
+  {
+    id: 'bh-3',
+    question: 'Tell me about yourself.',
+    category: 'career_transition',
+    hints: ['2-3 minute response', 'Present-Past-Future structure', 'End with why this role'],
+    sampleAnswer: 'I\'m currently a senior engineer at Microsoft where I\'ve spent the last 23 years building enterprise-scale solutions. Most recently, I\'ve been deeply involved in Azure AI services, helping enterprise customers adopt and scale AI solutions. Throughout my career, I\'ve progressed from hands-on development to technical leadership, always staying close to the technology. What excites me about OpenAI is the opportunity to work on foundational AI technology that\'s changing the world, while bringing my enterprise scaling experience to help more organizations benefit from these capabilities.',
+    keyPoints: ['Present role', 'Key achievements', 'Relevant experience', 'Why OpenAI'],
+    gregSpecific: 'Highlight your Azure OpenAI experience specifically - you understand both sides of the partnership.'
+  },
+  {
+    id: 'bh-4',
+    question: 'What\'s your greatest strength?',
+    category: 'strengths',
+    hints: ['Be specific', 'Give an example', 'Relate to the role'],
+    sampleAnswer: 'My greatest strength is bridging the gap between complex technical concepts and business value. After 23 years at Microsoft, I\'ve learned to translate cutting-edge technology into solutions that executives can understand and customers can adopt. For example, when Azure OpenAI was launching, I helped create the technical enablement program that helped our enterprise customers understand not just how to use the API, but how to build responsible AI practices around it.',
+    keyPoints: ['Specific strength', 'Concrete example', 'Relevance to role'],
+    gregSpecific: 'Your ability to work across technical and business domains is valuable for OpenAI\'s enterprise growth.'
+  },
+  {
+    id: 'bh-5',
+    question: 'Describe a time you failed and what you learned.',
+    category: 'conflict',
+    hints: ['Be honest', 'Focus on learning', 'Show growth'],
+    sampleAnswer: 'Early in my career at Microsoft, I led a project where I was so focused on the technical elegance of the solution that I didn\'t adequately involve stakeholders in the design process. We built something technically impressive but it didn\'t fully meet user needs. I learned that the best technical solution is worthless if it doesn\'t solve the right problem. Since then, I\'ve made stakeholder alignment and user feedback central to my approach.',
+    keyPoints: ['Real failure', 'Ownership', 'Specific learning', 'Changed behavior'],
+    gregSpecific: 'Choose a failure from earlier in your career to show growth over time.'
+  },
+  {
+    id: 'bh-6',
+    question: 'Why OpenAI specifically?',
+    category: 'motivation',
+    hints: ['Research the company', 'Be specific about mission', 'Connect to your experience'],
+    sampleAnswer: 'OpenAI is at the absolute frontier of AI development, and I believe the work being done here will define the next decade of technology. Having worked on Azure OpenAI, I\'ve seen firsthand how transformative these models are for enterprises. But I want to be closer to where the core innovation happens. I\'m also drawn to OpenAI\'s mission of ensuring AI benefits humanity - after 23 years in tech, I want my work to have that kind of impact.',
+    keyPoints: ['Specific to OpenAI', 'Mission alignment', 'Personal connection', 'Unique value'],
+    gregSpecific: 'Your Azure OpenAI experience gives you unique insight into how enterprises adopt these technologies.'
+  },
+  {
+    id: 'bh-7',
+    question: 'How do you handle disagreements with colleagues?',
+    category: 'conflict',
+    hints: ['Stay professional', 'Focus on resolution', 'Give example'],
+    sampleAnswer: 'I believe healthy disagreement leads to better outcomes. When I disagree with a colleague, I first make sure I fully understand their perspective by asking questions. Then I share my view with data and reasoning, not emotion. If we can\'t resolve it, I\'m comfortable escalating to get a decision, but I always commit fully once a decision is made, even if it wasn\'t my preferred approach.',
+    keyPoints: ['Listen first', 'Data-driven', 'Escalation path', 'Commitment to decisions'],
+    gregSpecific: 'With 23 years of experience, you\'ve navigated many disagreements - pick a recent example.'
+  },
+  {
+    id: 'bh-8',
+    question: 'Where do you see yourself in 5 years?',
+    category: 'motivation',
+    hints: ['Be ambitious but realistic', 'Align with company growth', 'Show commitment'],
+    sampleAnswer: 'In 5 years, I see myself as a technical leader at OpenAI who has helped scale the enterprise adoption of AI significantly. I want to have built teams, mentored engineers, and contributed to products that millions of people use daily. I\'m also passionate about responsible AI, so I hope to have influenced how we think about safety and alignment in production systems.',
+    keyPoints: ['Growth trajectory', 'Company alignment', 'Specific contributions', 'Long-term commitment'],
+    gregSpecific: 'Show you\'re committed to OpenAI long-term, not just looking for a stepping stone.'
+  },
+  {
+    id: 'bh-9',
+    question: 'What questions do you have for us?',
+    category: 'culture_fit',
+    hints: ['Prepare 3-5 questions', 'Show research', 'Ask about team/role'],
+    sampleAnswer: 'I have several questions: 1) How does this team collaborate with the research teams? 2) What does success look like in this role in the first 6 months? 3) How is OpenAI thinking about the balance between moving fast and ensuring safety? 4) What\'s the biggest challenge the team is facing right now?',
+    keyPoints: ['Thoughtful questions', 'Shows research', 'Role-specific', 'Company-level thinking'],
+    gregSpecific: 'Ask about the Microsoft partnership and how your Azure experience could be leveraged.'
+  },
+  {
+    id: 'bh-10',
+    question: 'How do you stay current with AI developments?',
+    category: 'motivation',
+    hints: ['Be specific', 'Show genuine interest', 'Mention diverse sources'],
+    sampleAnswer: 'I\'m genuinely passionate about AI, so staying current comes naturally. I read arXiv papers weekly, follow key researchers on Twitter, and participate in internal Microsoft AI communities. I also build side projects to experiment with new capabilities - recently I built a RAG application using GPT-4 to help me prepare for interviews. I find that hands-on experimentation is the best way to truly understand new developments.',
+    keyPoints: ['Multiple sources', 'Hands-on learning', 'Genuine passion', 'Specific examples'],
+    gregSpecific: 'Mention this training app as an example of your hands-on learning approach!'
+  }
+]
+
+// Screening Questions (Higher-level conceptual)
+export const SCREENING_QUESTIONS: QuestionBankItem[] = [
+  {
+    id: 'screen-1',
+    question: 'How do Large Language Models (LLMs) work at a high level?',
+    hints: ['Think about transformers', 'Next token prediction', 'Training on text data'],
+    expected_topics: ['transformers', 'attention', 'tokens', 'training'],
+    code_snippet: null,
+    options: [
+      'They memorize all possible responses and look them up',
+      'They use transformer architecture to predict the next token based on context',
+      'They search the internet in real-time for answers',
+      'They use rule-based systems with predefined responses'
+    ],
+    correct_option: 1,
+    blank_answer: 'transformer architecture predicting next tokens',
+    topic: 'api-basics',
+    subtopic: 'authentication',
+    difficulty: 'beginner',
+    azure_bridge: {
+      openai_way: 'GPT models use transformer architecture',
+      azure_equivalent: 'Same models available through Azure OpenAI',
+      key_differences: 'No difference in model architecture - Azure hosts the same models',
+      interview_phrase: 'The underlying transformer architecture is identical whether accessed through OpenAI or Azure OpenAI.'
+    }
+  },
+  {
+    id: 'screen-2',
+    question: 'What is prompt engineering and why is it important?',
+    hints: ['Crafting inputs', 'Improving outputs', 'No code changes needed'],
+    expected_topics: ['prompts', 'instructions', 'context', 'output quality'],
+    code_snippet: null,
+    options: [
+      'Writing code to modify the model weights',
+      'Designing effective inputs to get better outputs from LLMs without changing the model',
+      'Engineering the hardware that runs the models',
+      'Creating new model architectures'
+    ],
+    correct_option: 1,
+    blank_answer: 'designing effective inputs',
+    topic: 'chat-completions',
+    subtopic: 'messages',
+    difficulty: 'beginner',
+    azure_bridge: {
+      openai_way: 'Prompt engineering techniques apply universally',
+      azure_equivalent: 'Same techniques work in Azure OpenAI',
+      key_differences: 'Azure provides Prompt Flow for systematic prompt management',
+      interview_phrase: 'Prompt engineering is platform-agnostic, though Azure Prompt Flow adds enterprise tooling for prompt management.'
+    }
+  },
+  {
+    id: 'screen-3',
+    question: 'What is the difference between fine-tuning and prompt engineering?',
+    hints: ['One changes the model', 'One changes the input', 'Cost and complexity differ'],
+    expected_topics: ['fine-tuning', 'prompt engineering', 'model weights', 'training'],
+    code_snippet: null,
+    options: [
+      'They are the same thing',
+      'Fine-tuning modifies model weights with training data; prompt engineering crafts better inputs',
+      'Prompt engineering is more expensive than fine-tuning',
+      'Fine-tuning only works with GPT-3, not GPT-4'
+    ],
+    correct_option: 1,
+    blank_answer: 'fine-tuning modifies weights, prompting crafts inputs',
+    topic: 'fine-tuning',
+    subtopic: 'data-prep',
+    difficulty: 'beginner',
+    azure_bridge: {
+      openai_way: 'Both available through OpenAI API',
+      azure_equivalent: 'Both available through Azure OpenAI',
+      key_differences: 'Azure fine-tuning requires uploading data to Azure storage first',
+      interview_phrase: 'I typically recommend starting with prompt engineering and only moving to fine-tuning when you have clear evidence it\'s needed.'
+    }
+  },
+  {
+    id: 'screen-4',
+    question: 'What are tokens in the context of LLMs?',
+    hints: ['Not whole words', 'Subword units', 'Affect pricing and limits'],
+    expected_topics: ['tokens', 'tokenization', 'BPE', 'context window'],
+    code_snippet: null,
+    options: [
+      'Authentication credentials for API access',
+      'Subword units that models use to process text, affecting pricing and context limits',
+      'Individual characters in the input',
+      'Complete sentences that the model processes'
+    ],
+    correct_option: 1,
+    blank_answer: 'subword units',
+    topic: 'chat-completions',
+    subtopic: 'tokens',
+    difficulty: 'beginner',
+    azure_bridge: {
+      openai_way: 'Tokenization using tiktoken library',
+      azure_equivalent: 'Same tokenization, same token counts',
+      key_differences: 'No difference - tokenization is model-specific, not platform-specific',
+      interview_phrase: 'Token counting is identical across platforms since it\'s determined by the model\'s tokenizer, not the hosting platform.'
+    }
+  },
+  {
+    id: 'screen-5',
+    question: 'What is RAG (Retrieval-Augmented Generation)?',
+    hints: ['Combines retrieval with generation', 'Reduces hallucination', 'Uses external knowledge'],
+    expected_topics: ['RAG', 'retrieval', 'embeddings', 'grounding'],
+    code_snippet: null,
+    options: [
+      'A new type of neural network architecture',
+      'Combining document retrieval with LLM generation to ground responses in specific data',
+      'A method to make models run faster',
+      'A technique for compressing model size'
+    ],
+    correct_option: 1,
+    blank_answer: 'retrieval combined with generation',
+    topic: 'embeddings-rag',
+    subtopic: 'retrieval',
+    difficulty: 'beginner',
+    azure_bridge: {
+      openai_way: 'Build RAG with embeddings API + vector DB',
+      azure_equivalent: 'Azure AI Search provides integrated RAG with On Your Data',
+      key_differences: 'Azure offers turnkey RAG solution; OpenAI requires building the retrieval pipeline',
+      interview_phrase: 'Azure AI Search simplifies RAG significantly with its integrated vector search and On Your Data feature.'
+    }
+  },
+  {
+    id: 'screen-6',
+    question: 'What is hallucination in LLMs and how can you reduce it?',
+    hints: ['Confident but wrong', 'Grounding helps', 'Temperature affects it'],
+    expected_topics: ['hallucination', 'grounding', 'RAG', 'temperature'],
+    code_snippet: null,
+    options: [
+      'When the model produces visual images',
+      'When the model generates confident but factually incorrect information',
+      'When the model refuses to answer',
+      'When the model runs out of tokens'
+    ],
+    correct_option: 1,
+    blank_answer: 'confident but incorrect information',
+    topic: 'safety',
+    subtopic: 'responsible-ai',
+    difficulty: 'beginner',
+    azure_bridge: {
+      openai_way: 'Use RAG, lower temperature, ask model to cite sources',
+      azure_equivalent: 'Same techniques plus Azure content filtering',
+      key_differences: 'Azure On Your Data automatically grounds responses in your documents',
+      interview_phrase: 'RAG is the most effective hallucination reduction technique - grounding responses in retrieved documents.'
+    }
+  },
+  {
+    id: 'screen-7',
+    question: 'What is the context window and why does it matter?',
+    hints: ['Maximum input size', 'Affects what model can see', 'Varies by model'],
+    expected_topics: ['context window', 'tokens', 'memory', 'limitations'],
+    code_snippet: null,
+    options: [
+      'The GUI window where you type prompts',
+      'The maximum number of tokens the model can process in a single request',
+      'The time window for API rate limits',
+      'The browser window size for the playground'
+    ],
+    correct_option: 1,
+    blank_answer: 'maximum tokens per request',
+    topic: 'chat-completions',
+    subtopic: 'tokens',
+    difficulty: 'beginner',
+    azure_bridge: {
+      openai_way: 'GPT-4 Turbo: 128K tokens, GPT-4: 8K/32K',
+      azure_equivalent: 'Same context windows for same models',
+      key_differences: 'No difference - context window is model-specific',
+      interview_phrase: 'Context windows are identical across platforms since they\'re determined by the model architecture.'
+    }
+  },
+  {
+    id: 'screen-8',
+    question: 'What is the Assistants API and when would you use it?',
+    hints: ['Stateful conversations', 'Built-in tools', 'Thread management'],
+    expected_topics: ['Assistants', 'threads', 'stateful', 'tools'],
+    code_snippet: null,
+    options: [
+      'An API for creating chatbots with no memory',
+      'A stateful API that manages conversation threads, tool use, and file handling automatically',
+      'An API only for voice assistants',
+      'A deprecated API replaced by Chat Completions'
+    ],
+    correct_option: 1,
+    blank_answer: 'stateful conversation management',
+    topic: 'assistants-api',
+    subtopic: 'assistants',
+    difficulty: 'beginner',
+    azure_bridge: {
+      openai_way: 'Full Assistants API with threads, runs, tools',
+      azure_equivalent: 'Azure OpenAI Assistants API (preview)',
+      key_differences: 'Azure version is in preview with some feature limitations',
+      interview_phrase: 'The Assistants API is great for complex conversational apps where you need persistent state and tool use.'
+    }
+  }
+]
 
 const getUnlockedFormats = (progress: UserProgress): QuestionFormat[] => {
   const formats: QuestionFormat[] = ['multiple_choice']
@@ -96,7 +432,126 @@ const FORMAT_LABELS: Record<QuestionFormat, { label: string; color: string; icon
   multiple_choice: { label: 'Multiple Choice', color: 'text-emerald-400', icon: '🔘' },
   fill_blank: { label: 'Fill in the Blank', color: 'text-blue-400', icon: '✏️' },
   free_response: { label: 'Free Response', color: 'text-purple-400', icon: '📝' },
-  voice_explain: { label: 'Voice Explain', color: 'text-amber-400', icon: '🎤' }
+  voice_explain: { label: 'Voice Explain', color: 'text-amber-400', icon: '🎤' },
+  flashcard: { label: 'Flashcard', color: 'text-cyan-400', icon: '🃏' },
+  scenario: { label: 'Scenario', color: 'text-rose-400', icon: '🎭' },
+  teaching_moment: { label: 'Teaching Moment', color: 'text-lime-400', icon: '💡' },
+  code_recognition: { label: 'Code Recognition', color: 'text-orange-400', icon: '👁️' },
+  code_fix: { label: 'Code Fix', color: 'text-red-400', icon: '🔧' }
+}
+
+// Spaced Repetition Algorithm (SM-2 inspired)
+export const calculateNextReview = (
+  item: SpacedRepetitionItem,
+  score: number // 0-100
+): SpacedRepetitionItem => {
+  const quality = Math.round((score / 100) * 5) // Convert to 0-5 scale
+  
+  let newEaseFactor = item.easeFactor + (0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02))
+  newEaseFactor = Math.max(1.3, newEaseFactor) // Minimum ease factor
+  
+  let newInterval: number
+  let newRepetitions: number
+  
+  if (quality < 3) {
+    // Failed - reset
+    newRepetitions = 0
+    newInterval = 1
+  } else {
+    newRepetitions = item.repetitions + 1
+    if (item.repetitions === 0) {
+      newInterval = 1
+    } else if (item.repetitions === 1) {
+      newInterval = 6
+    } else {
+      newInterval = Math.round(item.interval * newEaseFactor)
+    }
+  }
+  
+  const nextReview = new Date()
+  nextReview.setDate(nextReview.getDate() + newInterval)
+  
+  return {
+    ...item,
+    easeFactor: newEaseFactor,
+    interval: newInterval,
+    repetitions: newRepetitions,
+    nextReview: nextReview.toISOString(),
+    lastScore: score
+  }
+}
+
+// Get questions due for review based on spaced repetition
+export const getQuestionsForReview = (
+  spacedRepData: Record<string, SpacedRepetitionItem>,
+  allQuestions: QuestionBankItem[]
+): QuestionBankItem[] => {
+  const now = new Date()
+  const dueQuestions: QuestionBankItem[] = []
+  const newQuestions: QuestionBankItem[] = []
+  
+  for (const q of allQuestions) {
+    const srItem = spacedRepData[q.id]
+    if (!srItem) {
+      // New question, never seen
+      newQuestions.push(q)
+    } else if (new Date(srItem.nextReview) <= now) {
+      // Due for review
+      dueQuestions.push(q)
+    }
+  }
+  
+  // Prioritize due questions, then add new ones
+  // Sort due questions by how overdue they are
+  dueQuestions.sort((a, b) => {
+    const aDate = new Date(spacedRepData[a.id].nextReview)
+    const bDate = new Date(spacedRepData[b.id].nextReview)
+    return aDate.getTime() - bDate.getTime()
+  })
+  
+  return [...dueQuestions, ...newQuestions]
+}
+
+// Adaptive difficulty based on recent performance
+export const getAdaptiveDifficulty = (
+  recentScores: number[],
+  currentDifficulty: 'beginner' | 'intermediate' | 'advanced'
+): 'beginner' | 'intermediate' | 'advanced' => {
+  if (recentScores.length < 3) return currentDifficulty
+  
+  const avgRecent = recentScores.slice(-5).reduce((a, b) => a + b, 0) / Math.min(5, recentScores.length)
+  
+  if (avgRecent >= 85 && currentDifficulty !== 'advanced') {
+    return currentDifficulty === 'beginner' ? 'intermediate' : 'advanced'
+  }
+  if (avgRecent < 50 && currentDifficulty !== 'beginner') {
+    return currentDifficulty === 'advanced' ? 'intermediate' : 'beginner'
+  }
+  
+  return currentDifficulty
+}
+
+// Teaching moment generator
+export const generateTeachingMoment = (
+  question: QuestionBankItem,
+  _userAnswer: string,
+  wasCorrect: boolean
+): string => {
+  if (wasCorrect) {
+    return `Great job! ${question.azure_bridge.interview_phrase}`
+  }
+  
+  return `Let's learn from this! The correct answer involves ${question.blank_answer}. 
+
+**OpenAI Way:** ${question.azure_bridge.openai_way}
+
+**Azure Equivalent:** ${question.azure_bridge.azure_equivalent}
+
+**Key Difference:** ${question.azure_bridge.key_differences}
+
+**Interview Tip:** ${question.azure_bridge.interview_phrase}
+
+This concept is important because it's frequently asked in interviews. Try to remember the key differences between OpenAI and Azure approaches.`
 }
 
 const TOPICS: Topic[] = [
@@ -228,14 +683,19 @@ interface QuestionBankItem {
 }
 
 const QUESTION_BANK: QuestionBankItem[] = [
-  // API Basics - Authentication
+  // API Basics - Authentication (IMPROVED DISTRACTORS)
   {
     id: 'api-auth-1',
     question: 'What is the primary method for authenticating with the OpenAI API?',
     hints: ['Think about HTTP headers', 'Bearer token pattern'],
     expected_topics: ['authentication', 'API keys', 'headers'],
     code_snippet: null,
-    options: ['OAuth 2.0 with refresh tokens', 'API key in Authorization header as Bearer token', 'Basic authentication with username/password', 'Certificate-based authentication'],
+    options: [
+      'OAuth 2.0 with client credentials flow and refresh tokens',
+      'API key in Authorization header as Bearer token',
+      'API key in the request body as a JSON parameter',
+      'Session-based authentication with cookies'
+    ],
     correct_option: 1,
     blank_answer: 'Bearer token',
     topic: 'api-basics',
@@ -254,7 +714,12 @@ const QUESTION_BANK: QuestionBankItem[] = [
     hints: ['Environment variables', 'Secret management services'],
     expected_topics: ['security', 'environment variables', 'key management'],
     code_snippet: null,
-    options: ['Hardcode in source code for easy access', 'Store in environment variables or secret management service', 'Include in client-side JavaScript', 'Save in a public configuration file'],
+    options: [
+      'Store in a private GitHub repository with restricted access',
+      'Store in environment variables or a secret management service like AWS Secrets Manager',
+      'Encrypt and store in the application database with AES-256',
+      'Store in a .env file committed to version control with .gitignore'
+    ],
     correct_option: 1,
     blank_answer: 'environment variables',
     topic: 'api-basics',
@@ -267,14 +732,19 @@ const QUESTION_BANK: QuestionBankItem[] = [
       interview_phrase: 'In Azure, we leverage Key Vault for secure key storage and Managed Identity to eliminate the need for storing credentials entirely.'
     }
   },
-  // Chat Completions - Messages
+  // Chat Completions - Messages (IMPROVED DISTRACTORS)
   {
     id: 'chat-msg-1',
     question: 'What are the three primary message roles in the Chat Completions API?',
     hints: ['Think about who is speaking', 'System sets the behavior'],
     expected_topics: ['messages', 'roles', 'system', 'user', 'assistant'],
     code_snippet: null,
-    options: ['admin, user, bot', 'system, user, assistant', 'prompt, response, context', 'input, output, memory'],
+    options: [
+      'developer, human, ai',
+      'system, user, assistant',
+      'context, query, response',
+      'instruction, input, output'
+    ],
     correct_option: 1,
     blank_answer: 'system, user, assistant',
     topic: 'chat-completions',
@@ -293,7 +763,12 @@ const QUESTION_BANK: QuestionBankItem[] = [
     hints: ['Sets the AI behavior', 'Defines personality and constraints'],
     expected_topics: ['system message', 'behavior', 'instructions'],
     code_snippet: null,
-    options: ['To store conversation history', 'To define the AI assistant behavior and constraints', 'To handle error messages', 'To manage rate limiting'],
+    options: [
+      'To provide context from previous conversations for memory',
+      'To define the AI assistant behavior, personality, and constraints',
+      'To specify the output format like JSON or markdown',
+      'To set token limits and control response length'
+    ],
     correct_option: 1,
     blank_answer: 'behavior and constraints',
     topic: 'chat-completions',
@@ -306,14 +781,19 @@ const QUESTION_BANK: QuestionBankItem[] = [
       interview_phrase: 'System messages work identically, and Azure content filtering can be tuned to complement your system message guidelines.'
     }
   },
-  // Chat Completions - Parameters
+  // Chat Completions - Parameters (IMPROVED DISTRACTORS)
   {
     id: 'chat-params-1',
     question: 'What does the temperature parameter control in Chat Completions?',
     hints: ['Affects randomness', 'Range from 0 to 2'],
     expected_topics: ['temperature', 'randomness', 'creativity'],
     code_snippet: null,
-    options: ['Response length', 'Randomness/creativity of responses', 'Processing speed', 'Token cost'],
+    options: [
+      'The maximum number of tokens in the response',
+      'The randomness and creativity of the model responses',
+      'The speed of response generation (higher = faster)',
+      'The confidence threshold for the model predictions'
+    ],
     correct_option: 1,
     blank_answer: 'randomness',
     topic: 'chat-completions',
@@ -332,7 +812,12 @@ const QUESTION_BANK: QuestionBankItem[] = [
     hints: ['Both affect randomness', 'Nucleus sampling'],
     expected_topics: ['temperature', 'top_p', 'sampling'],
     code_snippet: null,
-    options: ['Temperature is for speed, top_p is for quality', 'Temperature scales logits, top_p uses nucleus sampling', 'They are identical parameters', 'Temperature is deprecated, use top_p instead'],
+    options: [
+      'Temperature controls creativity, top_p controls response length',
+      'Temperature scales the probability distribution, top_p uses nucleus sampling to limit token selection',
+      'Temperature is for chat models, top_p is for completion models',
+      'Temperature affects input processing, top_p affects output generation'
+    ],
     correct_option: 1,
     blank_answer: 'nucleus sampling',
     topic: 'chat-completions',
@@ -345,14 +830,19 @@ const QUESTION_BANK: QuestionBankItem[] = [
       interview_phrase: 'Best practice is to adjust either temperature or top_p, not both simultaneously, to maintain predictable behavior.'
     }
   },
-  // Function Calling - Tool Definition
+  // Function Calling - Tool Definition (IMPROVED DISTRACTORS)
   {
     id: 'func-tool-1',
     question: 'What format is used to define tools/functions for the Chat Completions API?',
     hints: ['Schema definition', 'Describes parameters'],
     expected_topics: ['JSON Schema', 'function definition', 'tools'],
     code_snippet: null,
-    options: ['YAML configuration', 'JSON Schema', 'XML definition', 'Protocol Buffers'],
+    options: [
+      'OpenAPI/Swagger specification format',
+      'JSON Schema for parameter definitions',
+      'TypeScript interface definitions',
+      'GraphQL schema definition language'
+    ],
     correct_option: 1,
     blank_answer: 'JSON Schema',
     topic: 'function-calling',
@@ -371,7 +861,12 @@ const QUESTION_BANK: QuestionBankItem[] = [
     hints: ['Controls when functions are called', 'auto, none, or specific'],
     expected_topics: ['tool_choice', 'function calling', 'control'],
     code_snippet: null,
-    options: ['Selects which model to use', 'Controls whether and which tools the model should call', 'Determines response format', 'Sets the maximum number of tool calls'],
+    options: [
+      'Specifies which tools are available to the model',
+      'Controls whether and which specific tool the model should call',
+      'Sets the priority order for multiple tools',
+      'Determines if tool results should be streamed'
+    ],
     correct_option: 1,
     blank_answer: 'controls tool calling',
     topic: 'function-calling',
@@ -384,14 +879,19 @@ const QUESTION_BANK: QuestionBankItem[] = [
       interview_phrase: 'tool_choice gives us fine-grained control - auto for model discretion, none to disable, or specify a function to force its use.'
     }
   },
-  // Embeddings & RAG
+  // Embeddings & RAG (IMPROVED DISTRACTORS)
   {
     id: 'embed-1',
     question: 'What is the output of the Embeddings API?',
     hints: ['Numerical representation', 'Vector'],
     expected_topics: ['embeddings', 'vectors', 'dimensions'],
     code_snippet: null,
-    options: ['A text summary', 'A numerical vector representing the input', 'A classification label', 'A similarity score'],
+    options: [
+      'A semantic similarity score between 0 and 1',
+      'A high-dimensional numerical vector representing the input text',
+      'A compressed text representation for storage',
+      'A list of related keywords and topics'
+    ],
     correct_option: 1,
     blank_answer: 'numerical vector',
     topic: 'embeddings-rag',
@@ -410,7 +910,12 @@ const QUESTION_BANK: QuestionBankItem[] = [
     hints: ['Balance between context and specificity', 'Typically 500-1500 tokens'],
     expected_topics: ['chunking', 'RAG', 'document processing'],
     code_snippet: null,
-    options: ['As large as possible for maximum context', '500-1500 tokens with overlap', 'Exactly 100 tokens', 'One sentence per chunk'],
+    options: [
+      'Match the model context window (e.g., 128K tokens) for maximum context',
+      '500-1500 tokens with 10-20% overlap between chunks',
+      'One paragraph per chunk regardless of length',
+      '50-100 tokens for maximum granularity in search'
+    ],
     correct_option: 1,
     blank_answer: '500-1500 tokens',
     topic: 'embeddings-rag',
@@ -423,14 +928,19 @@ const QUESTION_BANK: QuestionBankItem[] = [
       interview_phrase: 'Azure AI Search simplifies RAG by providing built-in document chunking and vectorization in the indexer, reducing custom code.'
     }
   },
-  // Assistants API
+  // Assistants API (IMPROVED DISTRACTORS)
   {
     id: 'assist-1',
     question: 'What are the main components of the Assistants API?',
     hints: ['Persistent entities', 'Conversation management'],
     expected_topics: ['Assistants', 'Threads', 'Messages', 'Runs'],
     code_snippet: null,
-    options: ['Models, Prompts, Responses', 'Assistants, Threads, Messages, Runs', 'Agents, Tasks, Results', 'Bots, Channels, Events'],
+    options: [
+      'Agents, Conversations, Responses, Actions',
+      'Assistants, Threads, Messages, Runs',
+      'Bots, Sessions, Prompts, Completions',
+      'Models, Contexts, Queries, Results'
+    ],
     correct_option: 1,
     blank_answer: 'Assistants, Threads, Messages, Runs',
     topic: 'assistants-api',
@@ -449,7 +959,12 @@ const QUESTION_BANK: QuestionBankItem[] = [
     hints: ['Asynchronous pattern', 'Status checking'],
     expected_topics: ['polling', 'streaming', 'run status'],
     code_snippet: null,
-    options: ['Synchronous blocking call', 'Polling the run status or using streaming', 'Webhook callbacks only', 'Automatic retry mechanism'],
+    options: [
+      'Set a longer timeout and wait synchronously',
+      'Poll the run status endpoint or use streaming for real-time updates',
+      'Use webhooks configured in the Assistant settings',
+      'Queue the request and check a separate results endpoint'
+    ],
     correct_option: 1,
     blank_answer: 'polling or streaming',
     topic: 'assistants-api',
@@ -462,14 +977,19 @@ const QUESTION_BANK: QuestionBankItem[] = [
       interview_phrase: 'We implement polling with exponential backoff or use streaming when available for responsive user experiences.'
     }
   },
-  // Fine-Tuning
+  // Fine-Tuning (IMPROVED DISTRACTORS)
   {
     id: 'finetune-1',
     question: 'What format is required for fine-tuning training data?',
     hints: ['Line-delimited', 'JSON format'],
     expected_topics: ['JSONL', 'training data', 'format'],
     code_snippet: null,
-    options: ['CSV with headers', 'JSONL (JSON Lines) format', 'Plain text files', 'Parquet files'],
+    options: [
+      'CSV with columns for prompt and completion',
+      'JSONL (JSON Lines) with messages array per line',
+      'JSON array containing all training examples',
+      'Markdown files with prompt/response pairs'
+    ],
     correct_option: 1,
     blank_answer: 'JSONL',
     topic: 'fine-tuning',
@@ -484,11 +1004,40 @@ const QUESTION_BANK: QuestionBankItem[] = [
   },
   {
     id: 'finetune-2',
+    question: 'What hyperparameters can you adjust when fine-tuning?',
+    hints: ['Training iterations', 'Learning rate'],
+    expected_topics: ['n_epochs', 'learning_rate_multiplier', 'batch_size'],
+    code_snippet: null,
+    options: [
+      'temperature, top_p, and max_tokens',
+      'n_epochs, learning_rate_multiplier, and batch_size',
+      'model_size, layer_count, and attention_heads',
+      'context_length, embedding_dim, and dropout_rate'
+    ],
+    correct_option: 1,
+    blank_answer: 'n_epochs, learning_rate_multiplier, batch_size',
+    topic: 'fine-tuning',
+    subtopic: 'hyperparameters',
+    difficulty: 'intermediate',
+    azure_bridge: {
+      openai_way: 'n_epochs, learning_rate_multiplier, batch_size',
+      azure_equivalent: 'Same hyperparameters available',
+      key_differences: 'Azure has the same fine-tuning hyperparameters.',
+      interview_phrase: 'Fine-tuning hyperparameters are identical - we typically start with defaults and adjust n_epochs based on validation loss.'
+    }
+  },
+  {
+    id: 'finetune-3',
     question: 'What is the minimum recommended number of training examples for fine-tuning?',
     hints: ['Quality over quantity', 'But need enough examples'],
     expected_topics: ['training data', 'examples', 'minimum'],
     code_snippet: null,
-    options: ['10 examples', '50-100 examples minimum, 500+ recommended', '1000 examples required', '10000 examples minimum'],
+    options: [
+      '10-20 high-quality examples is sufficient',
+      '50-100 examples minimum, with 500+ recommended for best results',
+      'At least 1,000 examples are required',
+      'No minimum - even 5 examples can work'
+    ],
     correct_option: 1,
     blank_answer: '50-100 minimum',
     topic: 'fine-tuning',
@@ -501,14 +1050,19 @@ const QUESTION_BANK: QuestionBankItem[] = [
       interview_phrase: 'We recommend starting with at least 50-100 high-quality examples, though 500+ typically yields better results.'
     }
   },
-  // Production Patterns
+  // Production Patterns (IMPROVED DISTRACTORS)
   {
     id: 'prod-1',
     question: 'What is the recommended approach for handling rate limits in production?',
     hints: ['Retry strategy', 'Exponential backoff'],
     expected_topics: ['rate limits', 'retry', 'backoff'],
     code_snippet: null,
-    options: ['Ignore rate limits and retry immediately', 'Implement exponential backoff with jitter', 'Increase API key quota only', 'Cache all responses indefinitely'],
+    options: [
+      'Catch 429 errors and retry immediately with the same request',
+      'Implement exponential backoff with jitter, respecting Retry-After headers',
+      'Queue all requests and process them sequentially',
+      'Increase your rate limit tier and ignore 429 errors'
+    ],
     correct_option: 1,
     blank_answer: 'exponential backoff',
     topic: 'production',
@@ -527,7 +1081,12 @@ const QUESTION_BANK: QuestionBankItem[] = [
     hints: ['Store previous results', 'Semantic similarity'],
     expected_topics: ['caching', 'semantic cache', 'latency'],
     code_snippet: null,
-    options: ['Use a faster model only', 'Implement semantic caching based on query similarity', 'Reduce max_tokens to 1', 'Disable streaming'],
+    options: [
+      'Use a smaller, faster model for all requests',
+      'Implement semantic caching that returns cached responses for similar queries',
+      'Reduce the max_tokens parameter to get shorter responses',
+      'Enable streaming to get partial responses faster'
+    ],
     correct_option: 1,
     blank_answer: 'semantic caching',
     topic: 'production',
@@ -540,14 +1099,19 @@ const QUESTION_BANK: QuestionBankItem[] = [
       interview_phrase: 'Azure API Management now offers semantic caching out of the box, which can significantly reduce costs and latency for similar queries.'
     }
   },
-  // Safety & Moderation
+  // Safety & Moderation (IMPROVED DISTRACTORS)
   {
     id: 'safety-1',
     question: 'What does the Moderation API check for?',
     hints: ['Content categories', 'Harmful content'],
     expected_topics: ['moderation', 'content filtering', 'safety'],
     code_snippet: null,
-    options: ['Grammar and spelling', 'Harmful content categories like hate, violence, self-harm', 'Code quality', 'Factual accuracy'],
+    options: [
+      'Factual accuracy and hallucinations in responses',
+      'Harmful content categories including hate speech, violence, self-harm, and sexual content',
+      'Copyright infringement and plagiarism',
+      'Personal identifiable information (PII) exposure'
+    ],
     correct_option: 1,
     blank_answer: 'harmful content',
     topic: 'safety',
@@ -566,7 +1130,12 @@ const QUESTION_BANK: QuestionBankItem[] = [
     hints: ['Malicious input', 'Input validation'],
     expected_topics: ['prompt injection', 'security', 'input validation'],
     code_snippet: null,
-    options: ['A performance optimization technique', 'An attack where user input tries to override system instructions', 'A method to improve response quality', 'A caching strategy'],
+    options: [
+      'A technique to improve prompt quality by injecting examples',
+      'An attack where user input attempts to override or bypass system instructions',
+      'A method to dynamically add context to prompts at runtime',
+      'A way to inject variables into prompt templates'
+    ],
     correct_option: 1,
     blank_answer: 'override system instructions',
     topic: 'safety',
@@ -577,6 +1146,716 @@ const QUESTION_BANK: QuestionBankItem[] = [
       azure_equivalent: 'Same defenses plus Azure content filtering jailbreak detection',
       key_differences: 'Azure content filtering includes jailbreak attempt detection.',
       interview_phrase: 'Azure content filtering includes jailbreak detection, adding a layer of defense against prompt injection attacks.'
+    }
+  },
+  // Additional API Basics Questions (IMPROVED DISTRACTORS)
+  {
+    id: 'api-basics-3',
+    question: 'What is the difference between the /chat/completions and /completions endpoints?',
+    hints: ['Message format vs raw text', 'Chat vs legacy'],
+    expected_topics: ['chat completions', 'completions', 'API endpoints'],
+    code_snippet: null,
+    options: [
+      '/chat/completions is for GPT-4 only, /completions is for GPT-3.5',
+      '/chat/completions uses structured message arrays, /completions uses raw text prompts',
+      '/completions supports streaming, /chat/completions does not',
+      '/chat/completions has higher rate limits than /completions'
+    ],
+    correct_option: 1,
+    blank_answer: 'message arrays vs raw prompts',
+    topic: 'api-basics',
+    subtopic: 'endpoints',
+    difficulty: 'beginner',
+    azure_bridge: {
+      openai_way: '/chat/completions for chat models, /completions for legacy',
+      azure_equivalent: 'Same endpoints available in Azure OpenAI',
+      key_differences: 'Azure recommends using chat completions for all new development.',
+      interview_phrase: 'Both platforms support chat completions as the primary endpoint, with legacy completions available for backward compatibility.'
+    }
+  },
+  {
+    id: 'api-basics-4',
+    question: 'What HTTP status code indicates you have exceeded your rate limit?',
+    hints: ['4xx error', 'Too many requests'],
+    expected_topics: ['rate limits', 'HTTP status', 'error handling'],
+    code_snippet: null,
+    options: [
+      '400 Bad Request - invalid parameters',
+      '401 Unauthorized - authentication failed',
+      '429 Too Many Requests - rate limit exceeded',
+      '503 Service Unavailable - server overloaded'
+    ],
+    correct_option: 2,
+    blank_answer: '429',
+    topic: 'api-basics',
+    subtopic: 'rate-limits',
+    difficulty: 'beginner',
+    azure_bridge: {
+      openai_way: '429 with Retry-After header',
+      azure_equivalent: 'Same 429 response with Retry-After',
+      key_differences: 'Azure provides more granular rate limit headers.',
+      interview_phrase: 'Both platforms return 429 with Retry-After headers - we implement exponential backoff respecting these headers.'
+    }
+  },
+  {
+    id: 'api-basics-5',
+    question: 'What is the purpose of the organization header in OpenAI API requests?',
+    hints: ['Multi-org accounts', 'Billing separation'],
+    expected_topics: ['organization', 'headers', 'billing'],
+    code_snippet: null,
+    options: [
+      'Required for all API requests to identify the caller',
+      'Specifies which organization to bill when using multi-org accounts',
+      'Enables organization-specific model fine-tunes',
+      'Sets rate limit tiers for the organization'
+    ],
+    correct_option: 1,
+    blank_answer: 'billing for multi-org',
+    topic: 'api-basics',
+    subtopic: 'authentication',
+    difficulty: 'intermediate',
+    azure_bridge: {
+      openai_way: 'OpenAI-Organization header',
+      azure_equivalent: 'Azure uses subscriptions and resource groups for billing separation',
+      key_differences: 'Azure uses Azure subscription model instead of organization headers.',
+      interview_phrase: 'In Azure, we use subscriptions and resource groups for cost management rather than organization headers.'
+    }
+  },
+  {
+    id: 'api-basics-6',
+    question: 'What is streaming in the context of the OpenAI API?',
+    hints: ['Real-time responses', 'Server-sent events'],
+    expected_topics: ['streaming', 'SSE', 'real-time'],
+    code_snippet: null,
+    options: [
+      'Uploading large files in chunks to the API',
+      'Receiving response tokens incrementally as they are generated via SSE',
+      'Processing multiple requests in a continuous pipeline',
+      'Real-time audio/video processing capabilities'
+    ],
+    correct_option: 1,
+    blank_answer: 'tokens as generated',
+    topic: 'api-basics',
+    subtopic: 'streaming',
+    difficulty: 'beginner',
+    azure_bridge: {
+      openai_way: 'stream: true returns SSE chunks',
+      azure_equivalent: 'Identical streaming support',
+      key_differences: 'No differences in streaming behavior.',
+      interview_phrase: 'Streaming works identically - we use it to improve perceived latency by showing tokens as they generate.'
+    }
+  },
+  // Additional Chat Completions Questions (IMPROVED DISTRACTORS)
+  {
+    id: 'chat-comp-3',
+    question: 'What is the max_tokens parameter used for?',
+    hints: ['Output length', 'Cost control'],
+    expected_topics: ['max_tokens', 'output length', 'parameters'],
+    code_snippet: null,
+    options: [
+      'Sets the maximum tokens allowed in the input prompt',
+      'Limits the maximum number of tokens the model will generate in the response',
+      'Controls the total conversation context window size',
+      'Defines the maximum tokens per minute for rate limiting'
+    ],
+    correct_option: 1,
+    blank_answer: 'output tokens',
+    topic: 'chat-completions',
+    subtopic: 'parameters',
+    difficulty: 'beginner',
+    azure_bridge: {
+      openai_way: 'max_tokens limits response length',
+      azure_equivalent: 'max_tokens or max_completion_tokens for newer models',
+      key_differences: 'GPT-5 models use max_completion_tokens instead of max_tokens.',
+      interview_phrase: 'For newer models like GPT-5, we use max_completion_tokens to control output length.'
+    }
+  },
+  {
+    id: 'chat-comp-4',
+    question: 'What is the purpose of the stop parameter?',
+    hints: ['Termination sequences', 'Custom stop words'],
+    expected_topics: ['stop sequences', 'parameters', 'output control'],
+    code_snippet: null,
+    options: [
+      'Pauses the API request for a specified duration',
+      'Defines sequences that cause the model to stop generating further tokens',
+      'Stops the model from generating unsafe content',
+      'Cancels the request if it exceeds a time limit'
+    ],
+    correct_option: 1,
+    blank_answer: 'stop generating',
+    topic: 'chat-completions',
+    subtopic: 'parameters',
+    difficulty: 'intermediate',
+    azure_bridge: {
+      openai_way: 'stop: ["\\n", "END"]',
+      azure_equivalent: 'Identical stop parameter',
+      key_differences: 'No differences in stop sequence behavior.',
+      interview_phrase: 'Stop sequences are useful for structured outputs - the model stops when it encounters any specified sequence.'
+    }
+  },
+  {
+    id: 'chat-comp-5',
+    question: 'What does the presence_penalty parameter do?',
+    hints: ['Token repetition', 'Encourages new topics'],
+    expected_topics: ['presence_penalty', 'repetition', 'parameters'],
+    code_snippet: null,
+    options: [
+      'Penalizes responses that are too long or verbose',
+      'Applies a flat penalty to tokens that have already appeared, encouraging topic diversity',
+      'Penalizes the model for generating low-confidence predictions',
+      'Reduces the likelihood of generating content similar to the input'
+    ],
+    correct_option: 1,
+    blank_answer: 'penalizes appeared tokens',
+    topic: 'chat-completions',
+    subtopic: 'parameters',
+    difficulty: 'intermediate',
+    azure_bridge: {
+      openai_way: 'presence_penalty: -2.0 to 2.0',
+      azure_equivalent: 'Identical parameter',
+      key_differences: 'No differences.',
+      interview_phrase: 'Presence penalty encourages the model to explore new topics by penalizing tokens that have already appeared.'
+    }
+  },
+  {
+    id: 'chat-comp-6',
+    question: 'How does frequency_penalty differ from presence_penalty?',
+    hints: ['Count-based vs binary', 'Repetition control'],
+    expected_topics: ['frequency_penalty', 'presence_penalty', 'comparison'],
+    code_snippet: null,
+    options: [
+      'They are identical parameters with different names for compatibility',
+      'frequency_penalty scales proportionally with token occurrence count, presence_penalty is a flat penalty',
+      'frequency_penalty affects input tokens, presence_penalty affects output tokens',
+      'frequency_penalty controls word repetition, presence_penalty controls phrase repetition'
+    ],
+    correct_option: 1,
+    blank_answer: 'scales with frequency',
+    topic: 'chat-completions',
+    subtopic: 'parameters',
+    difficulty: 'advanced',
+    azure_bridge: {
+      openai_way: 'frequency_penalty increases with each occurrence',
+      azure_equivalent: 'Identical behavior',
+      key_differences: 'No differences.',
+      interview_phrase: 'Frequency penalty is proportional to occurrence count, while presence penalty is a flat penalty for any occurrence.'
+    }
+  },
+  {
+    id: 'chat-comp-7',
+    question: 'What is the response_format parameter used for?',
+    hints: ['JSON mode', 'Structured output'],
+    expected_topics: ['response_format', 'JSON', 'structured output'],
+    code_snippet: null,
+    options: [
+      'Changes the encoding format of the API response (UTF-8, ASCII, etc.)',
+      'Constrains the model to output valid JSON that can be reliably parsed',
+      'Sets the language of the response (English, Spanish, etc.)',
+      'Specifies whether to return the response as text or binary'
+    ],
+    correct_option: 1,
+    blank_answer: 'valid JSON',
+    topic: 'chat-completions',
+    subtopic: 'parameters',
+    difficulty: 'intermediate',
+    azure_bridge: {
+      openai_way: 'response_format: {type: "json_object"}',
+      azure_equivalent: 'Same JSON mode support',
+      key_differences: 'Azure supports the same JSON mode.',
+      interview_phrase: 'JSON mode ensures valid JSON output - essential for programmatic parsing of responses.'
+    }
+  },
+  // Additional Function Calling Questions (IMPROVED DISTRACTORS)
+  {
+    id: 'func-call-3',
+    question: 'What happens when the model decides to call a function?',
+    hints: ['Response structure', 'Tool calls array'],
+    expected_topics: ['tool_calls', 'function calling', 'response'],
+    code_snippet: null,
+    options: [
+      'The OpenAI API automatically executes the function on their servers',
+      'The response includes a tool_calls array with the function name and arguments to execute locally',
+      'The API makes an HTTP request to your registered webhook endpoint',
+      'The function result is automatically included in the next response'
+    ],
+    correct_option: 1,
+    blank_answer: 'tool_calls in response',
+    topic: 'function-calling',
+    subtopic: 'execution',
+    difficulty: 'beginner',
+    azure_bridge: {
+      openai_way: 'response.choices[0].message.tool_calls',
+      azure_equivalent: 'Identical response structure',
+      key_differences: 'No differences in tool_calls format.',
+      interview_phrase: 'The model returns tool_calls - we execute the function locally and send results back in a tool message.'
+    }
+  },
+  {
+    id: 'func-call-4',
+    question: 'How do you send function results back to the model?',
+    hints: ['Tool role', 'Message with tool_call_id'],
+    expected_topics: ['tool message', 'function results', 'conversation'],
+    code_snippet: null,
+    options: [
+      'Append the result to the user message content',
+      'Add a message with role "tool", the matching tool_call_id, and the result as content',
+      'Include the result in the system message for the next request',
+      'Use a separate /function-results endpoint'
+    ],
+    correct_option: 1,
+    blank_answer: 'role tool with tool_call_id',
+    topic: 'function-calling',
+    subtopic: 'execution',
+    difficulty: 'intermediate',
+    azure_bridge: {
+      openai_way: '{role: "tool", tool_call_id: "...", content: "result"}',
+      azure_equivalent: 'Identical message format',
+      key_differences: 'No differences.',
+      interview_phrase: 'We send function results as tool messages with the matching tool_call_id to maintain conversation context.'
+    }
+  },
+  {
+    id: 'func-call-5',
+    question: 'What is parallel function calling?',
+    hints: ['Multiple functions', 'Single response'],
+    expected_topics: ['parallel', 'function calling', 'efficiency'],
+    code_snippet: null,
+    options: [
+      'Executing functions in parallel threads on your server',
+      'The model requesting multiple independent function calls in a single response',
+      'Calling the same function with different parameters simultaneously',
+      'Running function calls across multiple API endpoints'
+    ],
+    correct_option: 1,
+    blank_answer: 'multiple calls in one response',
+    topic: 'function-calling',
+    subtopic: 'advanced',
+    difficulty: 'intermediate',
+    azure_bridge: {
+      openai_way: 'Multiple tool_calls in response.choices[0].message.tool_calls',
+      azure_equivalent: 'Same parallel calling support',
+      key_differences: 'No differences.',
+      interview_phrase: 'Parallel function calling improves efficiency - the model can request multiple independent functions at once.'
+    }
+  },
+  {
+    id: 'func-call-6',
+    question: 'What is Structured Outputs and how does it relate to function calling?',
+    hints: ['Schema enforcement', 'Guaranteed format'],
+    expected_topics: ['structured outputs', 'schema', 'function calling'],
+    code_snippet: null,
+    options: [
+      'A separate API endpoint for generating structured data',
+      'A mode that guarantees model output exactly matches a provided JSON schema',
+      'A feature exclusive to GPT-3.5 for backward compatibility',
+      'A replacement for function calling that handles execution automatically'
+    ],
+    correct_option: 1,
+    blank_answer: 'matches JSON schema exactly',
+    topic: 'function-calling',
+    subtopic: 'advanced',
+    difficulty: 'advanced',
+    azure_bridge: {
+      openai_way: 'strict: true in function definition',
+      azure_equivalent: 'Structured Outputs supported in Azure OpenAI',
+      key_differences: 'Azure supports Structured Outputs with the same strict mode.',
+      interview_phrase: 'Structured Outputs with strict mode guarantees schema compliance - essential for reliable function argument parsing.'
+    }
+  },
+  // Additional Embeddings & RAG Questions (IMPROVED DISTRACTORS)
+  {
+    id: 'embed-3',
+    question: 'What is cosine similarity and why is it used with embeddings?',
+    hints: ['Vector comparison', 'Angle between vectors'],
+    expected_topics: ['cosine similarity', 'embeddings', 'similarity'],
+    code_snippet: null,
+    options: [
+      'A type of embedding model optimized for similarity search',
+      'A metric that measures the angle between vectors to determine semantic similarity',
+      'A chunking strategy that groups similar content together',
+      'A database indexing technique for faster vector lookups'
+    ],
+    correct_option: 1,
+    blank_answer: 'angle between vectors',
+    topic: 'embeddings-rag',
+    subtopic: 'similarity',
+    difficulty: 'intermediate',
+    azure_bridge: {
+      openai_way: 'Cosine similarity for vector comparison',
+      azure_equivalent: 'Azure AI Search uses cosine similarity by default',
+      key_differences: 'Azure AI Search has built-in vector similarity search.',
+      interview_phrase: 'Cosine similarity is the standard metric - Azure AI Search handles this automatically in vector search.'
+    }
+  },
+  {
+    id: 'embed-4',
+    question: 'What is the dimensions parameter in text-embedding-3 models?',
+    hints: ['Vector size', 'Matryoshka embeddings'],
+    expected_topics: ['dimensions', 'embeddings', 'text-embedding-3'],
+    code_snippet: null,
+    options: [
+      'The maximum number of documents that can be embedded in one request',
+      'Allows reducing the embedding vector size for storage/compute efficiency trade-offs',
+      'The number of parallel API calls allowed',
+      'The maximum input text length in characters'
+    ],
+    correct_option: 1,
+    blank_answer: 'reducing dimensions',
+    topic: 'embeddings-rag',
+    subtopic: 'embeddings',
+    difficulty: 'advanced',
+    azure_bridge: {
+      openai_way: 'dimensions: 256/512/1024/1536/3072',
+      azure_equivalent: 'Same dimensions parameter support',
+      key_differences: 'No differences.',
+      interview_phrase: 'Matryoshka embeddings let us trade off between quality and storage/compute costs by reducing dimensions.'
+    }
+  },
+  {
+    id: 'embed-5',
+    question: 'What is hybrid search in the context of RAG?',
+    hints: ['Combining methods', 'Keyword + semantic'],
+    expected_topics: ['hybrid search', 'RAG', 'retrieval'],
+    code_snippet: null,
+    options: ['Using two different LLMs', 'Combining keyword search with vector similarity search', 'Searching multiple databases', 'Using both CPU and GPU'],
+    correct_option: 1,
+    blank_answer: 'keyword + vector',
+    topic: 'embeddings-rag',
+    subtopic: 'retrieval',
+    difficulty: 'intermediate',
+    azure_bridge: {
+      openai_way: 'Custom implementation combining BM25 + vectors',
+      azure_equivalent: 'Azure AI Search has built-in hybrid search',
+      key_differences: 'Azure AI Search provides hybrid search out of the box.',
+      interview_phrase: 'Azure AI Search hybrid search combines BM25 keyword matching with vector similarity for better retrieval quality.'
+    }
+  },
+  {
+    id: 'embed-6',
+    question: 'What is semantic ranking in Azure AI Search?',
+    hints: ['Re-ranking', 'Deep learning'],
+    expected_topics: ['semantic ranking', 'Azure AI Search', 'reranking'],
+    code_snippet: null,
+    options: ['Initial search method', 'A re-ranking step using deep learning for better relevance', 'A type of embedding', 'A caching strategy'],
+    correct_option: 1,
+    blank_answer: 're-ranking with deep learning',
+    topic: 'embeddings-rag',
+    subtopic: 'retrieval',
+    difficulty: 'advanced',
+    azure_bridge: {
+      openai_way: 'Custom reranking with cross-encoder models',
+      azure_equivalent: 'Built-in semantic ranker in Azure AI Search',
+      key_differences: 'Azure provides semantic ranking as a managed service.',
+      interview_phrase: 'Azure AI Search semantic ranker applies deep learning re-ranking to improve result relevance without custom infrastructure.'
+    }
+  },
+  // Additional Assistants API Questions
+  {
+    id: 'assist-3',
+    question: 'What is a Thread in the Assistants API?',
+    hints: ['Conversation container', 'Message history'],
+    expected_topics: ['Thread', 'Assistants API', 'conversation'],
+    code_snippet: null,
+    options: ['A background process', 'A container for a conversation that stores message history', 'A type of model', 'A rate limit category'],
+    correct_option: 1,
+    blank_answer: 'conversation container',
+    topic: 'assistants-api',
+    subtopic: 'threads',
+    difficulty: 'beginner',
+    azure_bridge: {
+      openai_way: 'client.beta.threads.create()',
+      azure_equivalent: 'Same Thread API in Azure OpenAI',
+      key_differences: 'Azure Assistants API is in preview.',
+      interview_phrase: 'Threads persist conversation state server-side, eliminating the need to manage message history client-side.'
+    }
+  },
+  {
+    id: 'assist-4',
+    question: 'What tools are available to Assistants?',
+    hints: ['Built-in capabilities', 'Code interpreter, retrieval'],
+    expected_topics: ['tools', 'code interpreter', 'retrieval', 'functions'],
+    code_snippet: null,
+    options: ['Only custom functions', 'Code Interpreter, File Search, and custom Functions', 'Only web browsing', 'Only image generation'],
+    correct_option: 1,
+    blank_answer: 'Code Interpreter, File Search, Functions',
+    topic: 'assistants-api',
+    subtopic: 'tools',
+    difficulty: 'intermediate',
+    azure_bridge: {
+      openai_way: 'code_interpreter, file_search, function tools',
+      azure_equivalent: 'Same tools available in Azure preview',
+      key_differences: 'Tool availability may vary in Azure preview.',
+      interview_phrase: 'Assistants can use Code Interpreter for computation, File Search for RAG, and custom functions for external integrations.'
+    }
+  },
+  {
+    id: 'assist-5',
+    question: 'What is a Run in the Assistants API?',
+    hints: ['Execution instance', 'Processing a thread'],
+    expected_topics: ['Run', 'execution', 'Assistants API'],
+    code_snippet: null,
+    options: ['A type of model', 'An invocation of an Assistant on a Thread to process messages', 'A billing unit', 'A test execution'],
+    correct_option: 1,
+    blank_answer: 'invocation on a Thread',
+    topic: 'assistants-api',
+    subtopic: 'runs',
+    difficulty: 'intermediate',
+    azure_bridge: {
+      openai_way: 'client.beta.threads.runs.create()',
+      azure_equivalent: 'Same Run API',
+      key_differences: 'No differences in Run concept.',
+      interview_phrase: 'A Run processes the Thread messages and generates a response, potentially using tools along the way.'
+    }
+  },
+  {
+    id: 'assist-6',
+    question: 'How do you handle required_action status in a Run?',
+    hints: ['Tool outputs needed', 'Submit results'],
+    expected_topics: ['required_action', 'tool outputs', 'Run status'],
+    code_snippet: null,
+    options: ['Restart the Run', 'Submit tool outputs using submit_tool_outputs', 'Cancel and retry', 'Wait for automatic resolution'],
+    correct_option: 1,
+    blank_answer: 'submit_tool_outputs',
+    topic: 'assistants-api',
+    subtopic: 'runs',
+    difficulty: 'advanced',
+    azure_bridge: {
+      openai_way: 'client.beta.threads.runs.submit_tool_outputs()',
+      azure_equivalent: 'Same tool output submission',
+      key_differences: 'No differences.',
+      interview_phrase: 'When a Run requires action, we execute the requested functions and submit results to continue processing.'
+    }
+  },
+  // Additional Fine-Tuning Questions
+  {
+    id: 'finetune-3',
+    question: 'What is the purpose of a validation file in fine-tuning?',
+    hints: ['Evaluation', 'Overfitting detection'],
+    expected_topics: ['validation', 'fine-tuning', 'evaluation'],
+    code_snippet: null,
+    options: ['Required for all fine-tuning jobs', 'Optional file to evaluate model performance and detect overfitting', 'Contains the model weights', 'Stores API credentials'],
+    correct_option: 1,
+    blank_answer: 'evaluate and detect overfitting',
+    topic: 'fine-tuning',
+    subtopic: 'training',
+    difficulty: 'intermediate',
+    azure_bridge: {
+      openai_way: 'validation_file parameter in fine-tuning job',
+      azure_equivalent: 'Same validation file support',
+      key_differences: 'No differences.',
+      interview_phrase: 'Validation files help monitor training progress and detect overfitting by evaluating on held-out data.'
+    }
+  },
+  {
+    id: 'finetune-4',
+    question: 'What hyperparameters can you adjust in fine-tuning?',
+    hints: ['Learning rate, epochs', 'Batch size'],
+    expected_topics: ['hyperparameters', 'fine-tuning', 'training'],
+    code_snippet: null,
+    options: ['Only the model name', 'n_epochs, learning_rate_multiplier, batch_size', 'Temperature and top_p', 'Max tokens only'],
+    correct_option: 1,
+    blank_answer: 'epochs, learning rate, batch size',
+    topic: 'fine-tuning',
+    subtopic: 'training',
+    difficulty: 'intermediate',
+    azure_bridge: {
+      openai_way: 'hyperparameters: {n_epochs, learning_rate_multiplier, batch_size}',
+      azure_equivalent: 'Same hyperparameter options',
+      key_differences: 'No differences.',
+      interview_phrase: 'We typically start with defaults and adjust epochs based on validation loss curves.'
+    }
+  },
+  {
+    id: 'finetune-5',
+    question: 'When should you consider fine-tuning vs few-shot prompting?',
+    hints: ['Cost, consistency', 'Use case specific'],
+    expected_topics: ['fine-tuning', 'few-shot', 'decision'],
+    code_snippet: null,
+    options: ['Always fine-tune for best results', 'Fine-tune for consistent style/format at scale, few-shot for flexibility', 'Few-shot is always better', 'They are interchangeable'],
+    correct_option: 1,
+    blank_answer: 'consistent style at scale',
+    topic: 'fine-tuning',
+    subtopic: 'decision',
+    difficulty: 'advanced',
+    azure_bridge: {
+      openai_way: 'Fine-tuning for style, few-shot for knowledge',
+      azure_equivalent: 'Same decision framework',
+      key_differences: 'Azure also offers Prompt Flow for prompt optimization.',
+      interview_phrase: 'Fine-tuning excels at consistent style and format, while few-shot is better for injecting specific knowledge or handling edge cases.'
+    }
+  },
+  {
+    id: 'finetune-6',
+    question: 'What is the suffix parameter in fine-tuning?',
+    hints: ['Model naming', 'Identification'],
+    expected_topics: ['suffix', 'model name', 'fine-tuning'],
+    code_snippet: null,
+    options: ['Adds text to all responses', 'Custom identifier appended to the fine-tuned model name', 'File extension for training data', 'API version suffix'],
+    correct_option: 1,
+    blank_answer: 'custom model name identifier',
+    topic: 'fine-tuning',
+    subtopic: 'management',
+    difficulty: 'beginner',
+    azure_bridge: {
+      openai_way: 'suffix: "my-custom-model"',
+      azure_equivalent: 'Custom deployment name in Azure',
+      key_differences: 'Azure uses deployment names for model identification.',
+      interview_phrase: 'The suffix helps identify fine-tuned models - in Azure, we use meaningful deployment names instead.'
+    }
+  },
+  // Additional Production Questions
+  {
+    id: 'prod-3',
+    question: 'What is the Batch API and when should you use it?',
+    hints: ['Async processing', 'Cost savings'],
+    expected_topics: ['Batch API', 'async', 'cost optimization'],
+    code_snippet: null,
+    options: ['Real-time processing', 'Async API for large volumes with 50% cost savings and 24-hour turnaround', 'A testing framework', 'Database batch operations'],
+    correct_option: 1,
+    blank_answer: '50% cost savings, 24-hour turnaround',
+    topic: 'production',
+    subtopic: 'optimization',
+    difficulty: 'intermediate',
+    azure_bridge: {
+      openai_way: 'Batch API with JSONL input files',
+      azure_equivalent: 'Azure OpenAI Batch API (preview)',
+      key_differences: 'Azure Batch API is in preview with similar functionality.',
+      interview_phrase: 'Batch API is ideal for non-time-sensitive workloads like daily report generation - 50% cost savings is significant at scale.'
+    }
+  },
+  {
+    id: 'prod-4',
+    question: 'How do you implement graceful degradation when the API is unavailable?',
+    hints: ['Fallbacks', 'User experience'],
+    expected_topics: ['graceful degradation', 'fallbacks', 'reliability'],
+    code_snippet: null,
+    options: ['Show error and stop', 'Implement fallback responses, cached results, or alternative models', 'Retry indefinitely', 'Ignore the error'],
+    correct_option: 1,
+    blank_answer: 'fallback responses or cached results',
+    topic: 'production',
+    subtopic: 'fallbacks',
+    difficulty: 'intermediate',
+    azure_bridge: {
+      openai_way: 'Custom fallback logic',
+      azure_equivalent: 'Azure API Management policies for fallbacks',
+      key_differences: 'Azure API Management can route to backup deployments automatically.',
+      interview_phrase: 'Azure API Management enables automatic failover to backup regions or models without application changes.'
+    }
+  },
+  {
+    id: 'prod-5',
+    question: 'What metrics should you monitor for an LLM application in production?',
+    hints: ['Latency, tokens', 'Quality metrics'],
+    expected_topics: ['monitoring', 'metrics', 'production'],
+    code_snippet: null,
+    options: ['Only error rates', 'Latency, token usage, error rates, and response quality metrics', 'Only cost', 'Only uptime'],
+    correct_option: 1,
+    blank_answer: 'latency, tokens, errors, quality',
+    topic: 'production',
+    subtopic: 'monitoring',
+    difficulty: 'intermediate',
+    azure_bridge: {
+      openai_way: 'Custom logging and monitoring',
+      azure_equivalent: 'Azure Monitor, Application Insights integration',
+      key_differences: 'Azure provides built-in monitoring with Application Insights.',
+      interview_phrase: 'Azure Monitor and Application Insights provide out-of-box LLM metrics including token usage, latency percentiles, and error rates.'
+    }
+  },
+  {
+    id: 'prod-6',
+    question: 'What is prompt caching and how does it reduce costs?',
+    hints: ['Repeated prefixes', 'Automatic optimization'],
+    expected_topics: ['prompt caching', 'cost optimization', 'performance'],
+    code_snippet: null,
+    options: ['Storing all responses', 'Automatically caches repeated prompt prefixes for faster, cheaper subsequent requests', 'Manual response caching', 'Caching model weights'],
+    correct_option: 1,
+    blank_answer: 'caches repeated prefixes',
+    topic: 'production',
+    subtopic: 'caching',
+    difficulty: 'advanced',
+    azure_bridge: {
+      openai_way: 'Automatic prompt caching for repeated prefixes',
+      azure_equivalent: 'Azure OpenAI supports prompt caching',
+      key_differences: 'Both platforms support automatic prompt caching.',
+      interview_phrase: 'Prompt caching automatically reduces costs when system prompts or context are repeated across requests.'
+    }
+  },
+  // Additional Safety Questions
+  {
+    id: 'safety-3',
+    question: 'What content categories does the Moderation API check?',
+    hints: ['Hate, violence', 'Multiple categories'],
+    expected_topics: ['moderation', 'content categories', 'safety'],
+    code_snippet: null,
+    options: ['Only profanity', 'Hate, harassment, self-harm, sexual, violence, and their subcategories', 'Only illegal content', 'Only spam'],
+    correct_option: 1,
+    blank_answer: 'hate, harassment, self-harm, sexual, violence',
+    topic: 'safety',
+    subtopic: 'moderation',
+    difficulty: 'intermediate',
+    azure_bridge: {
+      openai_way: 'Moderation API with category scores',
+      azure_equivalent: 'Azure Content Safety API with similar categories',
+      key_differences: 'Azure Content Safety provides additional customization options.',
+      interview_phrase: 'Azure Content Safety allows custom severity thresholds per category for enterprise compliance requirements.'
+    }
+  },
+  {
+    id: 'safety-4',
+    question: 'What is the difference between input and output content filtering?',
+    hints: ['Before vs after', 'Both directions'],
+    expected_topics: ['content filtering', 'input', 'output'],
+    code_snippet: null,
+    options: ['They are the same', 'Input filtering checks user prompts, output filtering checks model responses', 'Input is for images, output is for text', 'Only output filtering exists'],
+    correct_option: 1,
+    blank_answer: 'prompts vs responses',
+    topic: 'safety',
+    subtopic: 'content-filtering',
+    difficulty: 'intermediate',
+    azure_bridge: {
+      openai_way: 'Moderation API for both input and output',
+      azure_equivalent: 'Automatic input and output filtering in Azure OpenAI',
+      key_differences: 'Azure applies content filtering automatically to both input and output.',
+      interview_phrase: 'Azure OpenAI filters both directions by default - we can customize thresholds but cannot disable filtering entirely.'
+    }
+  },
+  {
+    id: 'safety-5',
+    question: 'How can you implement responsible AI practices in your application?',
+    hints: ['Multiple layers', 'Human oversight'],
+    expected_topics: ['responsible AI', 'best practices', 'safety'],
+    code_snippet: null,
+    options: ['Rely solely on model safety', 'Layer multiple safeguards: content filtering, output validation, human review, and user feedback', 'Only use the Moderation API', 'Disable all safety features for better performance'],
+    correct_option: 1,
+    blank_answer: 'multiple safeguards',
+    topic: 'safety',
+    subtopic: 'responsible-ai',
+    difficulty: 'advanced',
+    azure_bridge: {
+      openai_way: 'Custom implementation of safety layers',
+      azure_equivalent: 'Azure Responsible AI tools and content filtering',
+      key_differences: 'Azure provides Responsible AI dashboard and tools.',
+      interview_phrase: 'Azure Responsible AI tools help implement defense in depth - content filtering, custom blocklists, and monitoring dashboards.'
+    }
+  },
+  {
+    id: 'safety-6',
+    question: 'What is a jailbreak attempt and how do you detect it?',
+    hints: ['Bypass safety', 'Pattern detection'],
+    expected_topics: ['jailbreak', 'detection', 'safety'],
+    code_snippet: null,
+    options: ['A type of API error', 'An attempt to bypass model safety guidelines through crafted prompts', 'A performance optimization', 'A debugging technique'],
+    correct_option: 1,
+    blank_answer: 'bypass safety guidelines',
+    topic: 'safety',
+    subtopic: 'prompt-injection',
+    difficulty: 'advanced',
+    azure_bridge: {
+      openai_way: 'Custom detection logic',
+      azure_equivalent: 'Azure Content Safety jailbreak detection',
+      key_differences: 'Azure provides built-in jailbreak detection.',
+      interview_phrase: 'Azure Content Safety includes jailbreak detection that identifies common bypass patterns automatically.'
     }
   }
 ]
@@ -1573,33 +2852,76 @@ const QuestionScreen = ({
                   </CardContent>
                 </Card>
                 {feedback && (
-                  <Card className="bg-zinc-900 border-zinc-800">
-                    <CardHeader>
+                  <Card className="bg-zinc-900/80 border-zinc-700/50 backdrop-blur-sm shadow-xl">
+                    <CardHeader className="pb-2">
                       <div className="flex items-center justify-between">
-                        <CardTitle className="text-lg">Feedback</CardTitle>
-                        <div className="flex items-center gap-2">
-                          <span className={`text-3xl font-bold ${getScoreColor(feedback.score)}`}>{feedback.score}</span>
-                          <span className="text-zinc-500">/100</span>
+                        <CardTitle className="text-xl font-semibold text-zinc-100">Your Score</CardTitle>
+                        <div className="flex items-center gap-3 bg-zinc-800/50 px-4 py-2 rounded-xl">
+                          <span className={`text-4xl font-bold ${getScoreColor(feedback.score)}`}>{feedback.score}</span>
+                          <span className="text-zinc-400 text-lg">/100</span>
                         </div>
                       </div>
                     </CardHeader>
-                    <CardContent className="space-y-4">
-                      <p className="text-zinc-300">{feedback.feedback}</p>
-                      <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4">
-                        <h4 className="text-emerald-400 font-semibold mb-2">Ideal Answer</h4>
-                        <p className="text-zinc-300 text-sm">{feedback.correct_answer}</p>
+                    <CardContent className="space-y-6">
+                      <div className="bg-zinc-800/30 rounded-xl p-5 border border-zinc-700/30">
+                        <h4 className="text-orange-400 font-semibold text-lg mb-3 flex items-center gap-2">
+                          <MessageSquare className="w-5 h-5" /> Feedback
+                        </h4>
+                        <div className="text-zinc-200 text-base leading-relaxed space-y-3">
+                          {feedback.feedback.split('\n').map((para, i) => (
+                            <p key={i} className={para.startsWith('-') ? 'pl-4 border-l-2 border-zinc-600' : ''}>{para}</p>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-5">
+                        <h4 className="text-emerald-400 font-semibold text-lg mb-3 flex items-center gap-2">
+                          <CheckCircle className="w-5 h-5" /> Ideal Answer
+                        </h4>
+                        <div className="text-zinc-200 text-base leading-relaxed space-y-3">
+                          {feedback.correct_answer.split('\n').map((para, i) => {
+                            const isNumbered = /^\d+\)/.test(para.trim())
+                            const isBullet = para.trim().startsWith('-')
+                            return (
+                              <p key={i} className={`${isNumbered ? 'font-medium text-emerald-300 mt-4' : ''} ${isBullet ? 'pl-4 text-zinc-300 text-sm' : ''}`}>
+                                {para}
+                              </p>
+                            )
+                          })}
+                        </div>
                       </div>
                       {feedback.azure_alternative && (
-                        <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4">
-                          <h4 className="text-blue-400 font-semibold mb-2">Azure Equivalent</h4>
-                          <p className="text-zinc-300 text-sm">{feedback.azure_alternative}</p>
+                        <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-5">
+                          <h4 className="text-blue-400 font-semibold text-lg mb-3 flex items-center gap-2">
+                            <Sparkles className="w-5 h-5" /> Azure Bridge (Your Existing Knowledge)
+                          </h4>
+                          <p className="text-zinc-400 text-sm mb-3 italic">Use this to connect what you already know from Azure to OpenAI concepts</p>
+                          <div className="text-zinc-200 text-base leading-relaxed space-y-3">
+                            {feedback.azure_alternative.split('\n').map((para, i) => (
+                              <p key={i}>{para}</p>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {feedback.improvement_tips && feedback.improvement_tips.length > 0 && (
+                        <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-5">
+                          <h4 className="text-amber-400 font-semibold text-lg mb-3 flex items-center gap-2">
+                            <Lightbulb className="w-5 h-5" /> Tips to Improve
+                          </h4>
+                          <ul className="space-y-2">
+                            {feedback.improvement_tips.map((tip: string, i: number) => (
+                              <li key={i} className="flex items-start gap-3 text-zinc-200">
+                                <span className="text-amber-400 mt-1">•</span>
+                                <span>{tip}</span>
+                              </li>
+                            ))}
+                          </ul>
                         </div>
                       )}
                       <div className="flex gap-4 pt-4">
-                        <Button variant="outline" className="flex-1 border-zinc-700" onClick={handleNext}>
+                        <Button variant="outline" className="flex-1 border-zinc-600 hover:border-orange-500/50 hover:bg-orange-500/10" onClick={handleNext}>
                           <RotateCcw className="w-4 h-4 mr-2" /> Practice Similar
                         </Button>
-                        <Button onClick={handleNext} className="flex-1 bg-gradient-to-r from-orange-500 to-amber-500">
+                        <Button onClick={handleNext} className="flex-1 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-semibold shadow-lg shadow-orange-500/25">
                           Next Question <ChevronRight className="w-4 h-4 ml-2" />
                         </Button>
                       </div>
@@ -1775,7 +3097,7 @@ export default function App() {
   const [questionIndex, setQuestionIndex] = useState(0)
   const [totalQuestions, setTotalQuestions] = useState(20)
   const [timeLeft, setTimeLeft] = useState(1800)
-  const [sessionType, setSessionType] = useState('screening')
+  const [_sessionType, setSessionType] = useState('screening')
   const [sessionStats, setSessionStats] = useState<SessionStats>({ correct: 0, total: 0, streak: 0, bestStreak: 0 })
   const [avgScore, setAvgScore] = useState(0)
   const [totalScore, setTotalScore] = useState(0)
@@ -1783,13 +3105,15 @@ export default function App() {
   const [topicMastery, setTopicMastery] = useState<TopicMastery>({})
   const [currentTopic, setCurrentTopic] = useState<string>('')
   const [currentSubtopic, setCurrentSubtopic] = useState<string>('')
-  const [userProgress, setUserProgress] = useState<UserProgress>({
-    totalQuestionsAnswered: 0,
-    currentStreak: 0,
-    avgScore: 0,
-    unlockedFormats: ['multiple_choice'],
-    level: 1
-  })
+    const [userProgress, setUserProgress] = useState<UserProgress>({
+      totalQuestionsAnswered: 0,
+      currentStreak: 0,
+      avgScore: 0,
+      unlockedFormats: ['multiple_choice'],
+      level: 1,
+      practiceMode: 'guided',
+      showAzurePerspective: true
+    })
 
   useEffect(() => {
     const savedProgress = localStorage.getItem('userProgress')
@@ -1859,51 +3183,85 @@ export default function App() {
     await generateQuestion(type)
   }
 
-  const generateQuestion = async (type?: string, topicId?: string, subtopicId?: string) => {
-    setIsLoading(true)
+  const generateQuestion = (_type?: string, topicId?: string, subtopicId?: string) => {
     setFeedback(null)
-    setCurrentQuestion(null)
-
+    
     const topic = topicId || currentTopic
     const subtopic = subtopicId || currentSubtopic
-    const topicName = TOPICS.find(t => t.id === topic)?.name || ''
-    const subtopicName = TOPICS.find(t => t.id === topic)?.subtopics.find(s => s.id === subtopic)?.name || ''
-    
     const format = getQuestionFormat(userProgress, questionIndex + 1)
 
-    try {
-      const response = await fetch(`${API_URL}/api/question`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          category: subtopicName || topicName || '',
-          difficulty: 'medium',
-          interview_type: type || sessionType,
-          format: format
-        })
-      })
-      const data = await response.json()
-      
-      if (format === 'multiple_choice' && !data.options) {
-        const correctAnswer = data.correct_answer || data.expected_topics?.[0] || 'Correct answer'
-        const wrongAnswers = [
-          'This is not the correct approach',
-          'This option is incorrect',
-          'This is a common misconception'
-        ]
-        const allOptions = [correctAnswer, ...wrongAnswers].sort(() => Math.random() - 0.5)
-        data.options = allOptions
-        data.correct_option = allOptions.indexOf(correctAnswer)
-      }
-      
-      data.format = format
-      setCurrentQuestion(data)
-      setQuestionIndex(prev => prev + 1)
-    } catch (error) {
-      console.error('Failed to generate question:', error)
-    } finally {
-      setIsLoading(false)
+    // ADAPTIVE LEARNING: Determine target difficulty based on performance
+    const totalAnswered = userProgress.totalQuestionsAnswered
+    const avgScore = userProgress.avgScore
+    let targetDifficulty: 'beginner' | 'intermediate' | 'advanced' = 'beginner'
+    
+    // Progressive difficulty: Start easy, get harder as you improve
+    if (totalAnswered >= 30 && avgScore >= 80) {
+      targetDifficulty = 'advanced'
+    } else if (totalAnswered >= 15 && avgScore >= 70) {
+      targetDifficulty = 'intermediate'
+    } else if (totalAnswered >= 5 && avgScore >= 60) {
+      // Mix beginner and intermediate
+      targetDifficulty = Math.random() > 0.5 ? 'intermediate' : 'beginner'
     }
+
+    // ADAPTIVE LEARNING: Find weak areas from topicMastery
+    const weakTopics: string[] = []
+    Object.entries(topicMastery).forEach(([topicKey, subtopics]) => {
+      Object.entries(subtopics).forEach(([_subtopicKey, data]) => {
+        const accuracy = data.total > 0 ? data.correct / data.total : 0
+        if (data.total >= 2 && accuracy < 0.6) {
+          weakTopics.push(topicKey)
+        }
+      })
+    })
+
+    // Use local question bank for instant loading - no API call needed
+    let availableQuestions = QUESTION_BANK.filter(q => {
+      if (topic && q.topic !== topic) return false
+      if (subtopic && q.subtopic !== subtopic) return false
+      return true
+    })
+
+    // If no topic-specific questions, use all questions
+    if (availableQuestions.length === 0) {
+      availableQuestions = [...QUESTION_BANK]
+    }
+
+    // ADAPTIVE LEARNING: Prioritize weak areas (70% chance to pick from weak topics if available)
+    if (weakTopics.length > 0 && Math.random() < 0.7) {
+      const weakQuestions = availableQuestions.filter(q => weakTopics.includes(q.topic))
+      if (weakQuestions.length > 0) {
+        availableQuestions = weakQuestions
+      }
+    }
+
+    // ADAPTIVE LEARNING: Filter by target difficulty (with fallback)
+    const difficultyQuestions = availableQuestions.filter(q => q.difficulty === targetDifficulty)
+    if (difficultyQuestions.length > 0) {
+      availableQuestions = difficultyQuestions
+    }
+
+    // Pick a random question from the filtered bank
+    const randomIndex = Math.floor(Math.random() * availableQuestions.length)
+    const bankQuestion = availableQuestions[randomIndex]
+
+    // Convert bank question to the format expected by QuestionScreen
+    const question: Question = {
+      question: bankQuestion.question,
+      hints: bankQuestion.hints,
+      expected_topics: bankQuestion.expected_topics,
+      code_snippet: bankQuestion.code_snippet,
+      options: bankQuestion.options,
+      correct_option: bankQuestion.correct_option,
+      format: format,
+      topic: bankQuestion.topic,
+      subtopic: bankQuestion.subtopic,
+      azure_bridge: bankQuestion.azure_bridge
+    }
+
+    setCurrentQuestion(question)
+    setQuestionIndex(prev => prev + 1)
   }
 
   const submitAnswer = async (answer: string) => {
@@ -1912,18 +3270,43 @@ export default function App() {
     setIsLoading(true)
 
     try {
-      const response = await fetch(`${API_URL}/api/evaluate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          question: currentQuestion.question,
-          user_answer: answer,
-          is_azure_developer: true,
-          category: '',
-          difficulty: 'medium'
+      let data: Feedback
+      
+      // For multiple choice questions, evaluate locally without LLM
+      if (currentQuestion.format === 'multiple_choice' && currentQuestion.options && currentQuestion.correct_option !== undefined) {
+        const selectedIndex = currentQuestion.options.indexOf(answer)
+        const isCorrect = selectedIndex === currentQuestion.correct_option
+        const correctAnswer = currentQuestion.options[currentQuestion.correct_option]
+        
+        data = {
+          score: isCorrect ? 100 : 0,
+          feedback: isCorrect 
+            ? 'Correct! You selected the right answer.' 
+            : `Incorrect. You selected "${answer}" but the correct answer is "${correctAnswer}".`,
+          correct_answer: correctAnswer,
+          azure_alternative: currentQuestion.azure_bridge 
+            ? `OpenAI: ${currentQuestion.azure_bridge.openai_way}\n\nAzure: ${currentQuestion.azure_bridge.azure_equivalent}\n\nKey Differences: ${currentQuestion.azure_bridge.key_differences}\n\nInterview Tip: ${currentQuestion.azure_bridge.interview_phrase}`
+            : null,
+          improvement_tips: isCorrect 
+            ? ['Great job! Keep practicing to reinforce this knowledge.']
+            : ['Review this topic to strengthen your understanding.', 'Try to understand why the correct answer is right.']
+        }
+      } else {
+        // For free response and other formats, use LLM evaluation
+        const response = await fetch(`${API_URL}/api/evaluate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            question: currentQuestion.question,
+            user_answer: answer,
+            is_azure_developer: true,
+            category: '',
+            difficulty: 'medium'
+          })
         })
-      })
-      const data = await response.json()
+        data = await response.json()
+      }
+      
       setFeedback(data)
       
       const isCorrect = data.score >= 70
@@ -1964,11 +3347,11 @@ export default function App() {
     }
   }
 
-  const nextQuestion = async () => {
+  const nextQuestion = () => {
     if (questionIndex >= totalQuestions) {
       setScreen('summary')
     } else {
-      await generateQuestion()
+      generateQuestion()
     }
   }
 
