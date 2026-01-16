@@ -206,6 +206,864 @@ const TOPICS: Topic[] = [
   }
 ]
 
+// Pre-generated Question Banks with Azure Bridge Format
+interface QuestionBankItem {
+  id: string
+  question: string
+  hints: string[]
+  expected_topics: string[]
+  code_snippet: string | null
+  options: string[]
+  correct_option: number
+  blank_answer: string
+  topic: string
+  subtopic: string
+  difficulty: 'beginner' | 'intermediate' | 'advanced'
+  azure_bridge: {
+    openai_way: string
+    azure_equivalent: string
+    key_differences: string
+    interview_phrase: string
+  }
+}
+
+const QUESTION_BANK: QuestionBankItem[] = [
+  // API Basics - Authentication
+  {
+    id: 'api-auth-1',
+    question: 'What is the primary method for authenticating with the OpenAI API?',
+    hints: ['Think about HTTP headers', 'Bearer token pattern'],
+    expected_topics: ['authentication', 'API keys', 'headers'],
+    code_snippet: null,
+    options: ['OAuth 2.0 with refresh tokens', 'API key in Authorization header as Bearer token', 'Basic authentication with username/password', 'Certificate-based authentication'],
+    correct_option: 1,
+    blank_answer: 'Bearer token',
+    topic: 'api-basics',
+    subtopic: 'authentication',
+    difficulty: 'beginner',
+    azure_bridge: {
+      openai_way: 'Authorization: Bearer sk-xxx header',
+      azure_equivalent: 'api-key: xxx header OR Azure AD token',
+      key_differences: 'Azure supports both API key and Azure AD authentication. Azure uses api-key header instead of Authorization Bearer.',
+      interview_phrase: 'In Azure OpenAI, we have the flexibility of using either API keys or Azure AD tokens for authentication, which integrates well with enterprise identity management.'
+    }
+  },
+  {
+    id: 'api-auth-2',
+    question: 'How should you securely store and manage OpenAI API keys in a production application?',
+    hints: ['Environment variables', 'Secret management services'],
+    expected_topics: ['security', 'environment variables', 'key management'],
+    code_snippet: null,
+    options: ['Hardcode in source code for easy access', 'Store in environment variables or secret management service', 'Include in client-side JavaScript', 'Save in a public configuration file'],
+    correct_option: 1,
+    blank_answer: 'environment variables',
+    topic: 'api-basics',
+    subtopic: 'authentication',
+    difficulty: 'beginner',
+    azure_bridge: {
+      openai_way: 'Environment variables (OPENAI_API_KEY)',
+      azure_equivalent: 'Azure Key Vault, Managed Identity, or environment variables',
+      key_differences: 'Azure provides Key Vault for centralized secret management and Managed Identity for passwordless authentication.',
+      interview_phrase: 'In Azure, we leverage Key Vault for secure key storage and Managed Identity to eliminate the need for storing credentials entirely.'
+    }
+  },
+  // Chat Completions - Messages
+  {
+    id: 'chat-msg-1',
+    question: 'What are the three primary message roles in the Chat Completions API?',
+    hints: ['Think about who is speaking', 'System sets the behavior'],
+    expected_topics: ['messages', 'roles', 'system', 'user', 'assistant'],
+    code_snippet: null,
+    options: ['admin, user, bot', 'system, user, assistant', 'prompt, response, context', 'input, output, memory'],
+    correct_option: 1,
+    blank_answer: 'system, user, assistant',
+    topic: 'chat-completions',
+    subtopic: 'messages',
+    difficulty: 'beginner',
+    azure_bridge: {
+      openai_way: 'messages: [{role: "system"}, {role: "user"}, {role: "assistant"}]',
+      azure_equivalent: 'Identical message structure in Azure OpenAI',
+      key_differences: 'The message format is identical. Azure adds optional content filtering annotations.',
+      interview_phrase: 'The message structure is consistent between OpenAI and Azure OpenAI, making migration straightforward.'
+    }
+  },
+  {
+    id: 'chat-msg-2',
+    question: 'What is the purpose of the system message in Chat Completions?',
+    hints: ['Sets the AI behavior', 'Defines personality and constraints'],
+    expected_topics: ['system message', 'behavior', 'instructions'],
+    code_snippet: null,
+    options: ['To store conversation history', 'To define the AI assistant behavior and constraints', 'To handle error messages', 'To manage rate limiting'],
+    correct_option: 1,
+    blank_answer: 'behavior and constraints',
+    topic: 'chat-completions',
+    subtopic: 'messages',
+    difficulty: 'beginner',
+    azure_bridge: {
+      openai_way: 'System message sets assistant behavior',
+      azure_equivalent: 'Same functionality, plus Azure content filtering respects system message',
+      key_differences: 'Azure content filtering can be configured to work with system message guidelines.',
+      interview_phrase: 'System messages work identically, and Azure content filtering can be tuned to complement your system message guidelines.'
+    }
+  },
+  // Chat Completions - Parameters
+  {
+    id: 'chat-params-1',
+    question: 'What does the temperature parameter control in Chat Completions?',
+    hints: ['Affects randomness', 'Range from 0 to 2'],
+    expected_topics: ['temperature', 'randomness', 'creativity'],
+    code_snippet: null,
+    options: ['Response length', 'Randomness/creativity of responses', 'Processing speed', 'Token cost'],
+    correct_option: 1,
+    blank_answer: 'randomness',
+    topic: 'chat-completions',
+    subtopic: 'parameters',
+    difficulty: 'beginner',
+    azure_bridge: {
+      openai_way: 'temperature: 0.7 (0-2 range)',
+      azure_equivalent: 'Identical parameter and behavior',
+      key_differences: 'No differences - temperature works the same way.',
+      interview_phrase: 'Temperature behaves identically in both platforms - I typically use 0 for deterministic tasks and 0.7-1.0 for creative tasks.'
+    }
+  },
+  {
+    id: 'chat-params-2',
+    question: 'What is the difference between temperature and top_p parameters?',
+    hints: ['Both affect randomness', 'Nucleus sampling'],
+    expected_topics: ['temperature', 'top_p', 'sampling'],
+    code_snippet: null,
+    options: ['Temperature is for speed, top_p is for quality', 'Temperature scales logits, top_p uses nucleus sampling', 'They are identical parameters', 'Temperature is deprecated, use top_p instead'],
+    correct_option: 1,
+    blank_answer: 'nucleus sampling',
+    topic: 'chat-completions',
+    subtopic: 'parameters',
+    difficulty: 'intermediate',
+    azure_bridge: {
+      openai_way: 'temperature OR top_p (not both recommended)',
+      azure_equivalent: 'Same parameters and recommendation',
+      key_differences: 'OpenAI recommends using one or the other, not both. Same in Azure.',
+      interview_phrase: 'Best practice is to adjust either temperature or top_p, not both simultaneously, to maintain predictable behavior.'
+    }
+  },
+  // Function Calling - Tool Definition
+  {
+    id: 'func-tool-1',
+    question: 'What format is used to define tools/functions for the Chat Completions API?',
+    hints: ['Schema definition', 'Describes parameters'],
+    expected_topics: ['JSON Schema', 'function definition', 'tools'],
+    code_snippet: null,
+    options: ['YAML configuration', 'JSON Schema', 'XML definition', 'Protocol Buffers'],
+    correct_option: 1,
+    blank_answer: 'JSON Schema',
+    topic: 'function-calling',
+    subtopic: 'tool-definition',
+    difficulty: 'beginner',
+    azure_bridge: {
+      openai_way: 'tools: [{type: "function", function: {name, description, parameters}}]',
+      azure_equivalent: 'Identical tool definition format',
+      key_differences: 'Function calling works identically in Azure OpenAI.',
+      interview_phrase: 'Function calling is fully supported in Azure OpenAI with the same JSON Schema format for tool definitions.'
+    }
+  },
+  {
+    id: 'func-tool-2',
+    question: 'What is the tool_choice parameter used for?',
+    hints: ['Controls when functions are called', 'auto, none, or specific'],
+    expected_topics: ['tool_choice', 'function calling', 'control'],
+    code_snippet: null,
+    options: ['Selects which model to use', 'Controls whether and which tools the model should call', 'Determines response format', 'Sets the maximum number of tool calls'],
+    correct_option: 1,
+    blank_answer: 'controls tool calling',
+    topic: 'function-calling',
+    subtopic: 'tool-definition',
+    difficulty: 'intermediate',
+    azure_bridge: {
+      openai_way: 'tool_choice: "auto" | "none" | {type: "function", function: {name}}',
+      azure_equivalent: 'Same tool_choice options',
+      key_differences: 'No differences in tool_choice behavior.',
+      interview_phrase: 'tool_choice gives us fine-grained control - auto for model discretion, none to disable, or specify a function to force its use.'
+    }
+  },
+  // Embeddings & RAG
+  {
+    id: 'embed-1',
+    question: 'What is the output of the Embeddings API?',
+    hints: ['Numerical representation', 'Vector'],
+    expected_topics: ['embeddings', 'vectors', 'dimensions'],
+    code_snippet: null,
+    options: ['A text summary', 'A numerical vector representing the input', 'A classification label', 'A similarity score'],
+    correct_option: 1,
+    blank_answer: 'numerical vector',
+    topic: 'embeddings-rag',
+    subtopic: 'embeddings',
+    difficulty: 'beginner',
+    azure_bridge: {
+      openai_way: 'POST /embeddings with model: "text-embedding-3-large"',
+      azure_equivalent: 'POST /deployments/{deployment}/embeddings',
+      key_differences: 'Azure uses deployment names instead of model names in the endpoint.',
+      interview_phrase: 'In Azure, we reference our deployment name rather than the model name, which allows us to manage multiple deployments of the same model.'
+    }
+  },
+  {
+    id: 'embed-2',
+    question: 'What is the recommended chunk size for document embeddings in RAG applications?',
+    hints: ['Balance between context and specificity', 'Typically 500-1500 tokens'],
+    expected_topics: ['chunking', 'RAG', 'document processing'],
+    code_snippet: null,
+    options: ['As large as possible for maximum context', '500-1500 tokens with overlap', 'Exactly 100 tokens', 'One sentence per chunk'],
+    correct_option: 1,
+    blank_answer: '500-1500 tokens',
+    topic: 'embeddings-rag',
+    subtopic: 'chunking',
+    difficulty: 'intermediate',
+    azure_bridge: {
+      openai_way: 'Manual chunking with tiktoken',
+      azure_equivalent: 'Azure AI Search has built-in chunking, or use manual chunking',
+      key_differences: 'Azure AI Search provides integrated chunking and vectorization in the indexer pipeline.',
+      interview_phrase: 'Azure AI Search simplifies RAG by providing built-in document chunking and vectorization in the indexer, reducing custom code.'
+    }
+  },
+  // Assistants API
+  {
+    id: 'assist-1',
+    question: 'What are the main components of the Assistants API?',
+    hints: ['Persistent entities', 'Conversation management'],
+    expected_topics: ['Assistants', 'Threads', 'Messages', 'Runs'],
+    code_snippet: null,
+    options: ['Models, Prompts, Responses', 'Assistants, Threads, Messages, Runs', 'Agents, Tasks, Results', 'Bots, Channels, Events'],
+    correct_option: 1,
+    blank_answer: 'Assistants, Threads, Messages, Runs',
+    topic: 'assistants-api',
+    subtopic: 'assistants',
+    difficulty: 'beginner',
+    azure_bridge: {
+      openai_way: 'Assistants API with threads and runs',
+      azure_equivalent: 'Azure OpenAI Assistants API (preview)',
+      key_differences: 'Azure Assistants API is in preview with some feature limitations.',
+      interview_phrase: 'Azure OpenAI now supports the Assistants API in preview, enabling stateful conversations with tool use and file handling.'
+    }
+  },
+  {
+    id: 'assist-2',
+    question: 'How do you handle long-running Assistant runs?',
+    hints: ['Asynchronous pattern', 'Status checking'],
+    expected_topics: ['polling', 'streaming', 'run status'],
+    code_snippet: null,
+    options: ['Synchronous blocking call', 'Polling the run status or using streaming', 'Webhook callbacks only', 'Automatic retry mechanism'],
+    correct_option: 1,
+    blank_answer: 'polling or streaming',
+    topic: 'assistants-api',
+    subtopic: 'runs',
+    difficulty: 'intermediate',
+    azure_bridge: {
+      openai_way: 'Poll run status or use streaming',
+      azure_equivalent: 'Same polling/streaming patterns',
+      key_differences: 'Streaming support may vary in Azure preview.',
+      interview_phrase: 'We implement polling with exponential backoff or use streaming when available for responsive user experiences.'
+    }
+  },
+  // Fine-Tuning
+  {
+    id: 'finetune-1',
+    question: 'What format is required for fine-tuning training data?',
+    hints: ['Line-delimited', 'JSON format'],
+    expected_topics: ['JSONL', 'training data', 'format'],
+    code_snippet: null,
+    options: ['CSV with headers', 'JSONL (JSON Lines) format', 'Plain text files', 'Parquet files'],
+    correct_option: 1,
+    blank_answer: 'JSONL',
+    topic: 'fine-tuning',
+    subtopic: 'data-prep',
+    difficulty: 'beginner',
+    azure_bridge: {
+      openai_way: 'JSONL with messages array',
+      azure_equivalent: 'Same JSONL format',
+      key_differences: 'Azure requires uploading files to Azure OpenAI resource first.',
+      interview_phrase: 'The training data format is identical - JSONL with messages arrays. Azure requires uploading to the resource before creating the job.'
+    }
+  },
+  {
+    id: 'finetune-2',
+    question: 'What is the minimum recommended number of training examples for fine-tuning?',
+    hints: ['Quality over quantity', 'But need enough examples'],
+    expected_topics: ['training data', 'examples', 'minimum'],
+    code_snippet: null,
+    options: ['10 examples', '50-100 examples minimum, 500+ recommended', '1000 examples required', '10000 examples minimum'],
+    correct_option: 1,
+    blank_answer: '50-100 minimum',
+    topic: 'fine-tuning',
+    subtopic: 'data-prep',
+    difficulty: 'intermediate',
+    azure_bridge: {
+      openai_way: '50-100 minimum, more is better',
+      azure_equivalent: 'Same recommendations',
+      key_differences: 'Azure has the same data requirements.',
+      interview_phrase: 'We recommend starting with at least 50-100 high-quality examples, though 500+ typically yields better results.'
+    }
+  },
+  // Production Patterns
+  {
+    id: 'prod-1',
+    question: 'What is the recommended approach for handling rate limits in production?',
+    hints: ['Retry strategy', 'Exponential backoff'],
+    expected_topics: ['rate limits', 'retry', 'backoff'],
+    code_snippet: null,
+    options: ['Ignore rate limits and retry immediately', 'Implement exponential backoff with jitter', 'Increase API key quota only', 'Cache all responses indefinitely'],
+    correct_option: 1,
+    blank_answer: 'exponential backoff',
+    topic: 'production',
+    subtopic: 'fallbacks',
+    difficulty: 'intermediate',
+    azure_bridge: {
+      openai_way: 'Exponential backoff, check Retry-After header',
+      azure_equivalent: 'Same pattern, plus Azure API Management for advanced throttling',
+      key_differences: 'Azure API Management can provide additional rate limiting and caching layers.',
+      interview_phrase: 'In Azure, we can layer API Management in front for sophisticated rate limiting, caching, and multi-region failover.'
+    }
+  },
+  {
+    id: 'prod-2',
+    question: 'How can you reduce latency for repeated similar queries?',
+    hints: ['Store previous results', 'Semantic similarity'],
+    expected_topics: ['caching', 'semantic cache', 'latency'],
+    code_snippet: null,
+    options: ['Use a faster model only', 'Implement semantic caching based on query similarity', 'Reduce max_tokens to 1', 'Disable streaming'],
+    correct_option: 1,
+    blank_answer: 'semantic caching',
+    topic: 'production',
+    subtopic: 'caching',
+    difficulty: 'advanced',
+    azure_bridge: {
+      openai_way: 'Custom semantic cache implementation',
+      azure_equivalent: 'Azure API Management semantic caching or custom implementation',
+      key_differences: 'Azure API Management has built-in semantic caching capabilities.',
+      interview_phrase: 'Azure API Management now offers semantic caching out of the box, which can significantly reduce costs and latency for similar queries.'
+    }
+  },
+  // Safety & Moderation
+  {
+    id: 'safety-1',
+    question: 'What does the Moderation API check for?',
+    hints: ['Content categories', 'Harmful content'],
+    expected_topics: ['moderation', 'content filtering', 'safety'],
+    code_snippet: null,
+    options: ['Grammar and spelling', 'Harmful content categories like hate, violence, self-harm', 'Code quality', 'Factual accuracy'],
+    correct_option: 1,
+    blank_answer: 'harmful content',
+    topic: 'safety',
+    subtopic: 'moderation',
+    difficulty: 'beginner',
+    azure_bridge: {
+      openai_way: 'POST /moderations endpoint',
+      azure_equivalent: 'Built-in content filtering on all requests + optional Moderation API',
+      key_differences: 'Azure has automatic content filtering enabled by default on all requests.',
+      interview_phrase: 'Azure OpenAI has content filtering enabled by default, providing an additional safety layer beyond the Moderation API.'
+    }
+  },
+  {
+    id: 'safety-2',
+    question: 'What is prompt injection and how can you defend against it?',
+    hints: ['Malicious input', 'Input validation'],
+    expected_topics: ['prompt injection', 'security', 'input validation'],
+    code_snippet: null,
+    options: ['A performance optimization technique', 'An attack where user input tries to override system instructions', 'A method to improve response quality', 'A caching strategy'],
+    correct_option: 1,
+    blank_answer: 'override system instructions',
+    topic: 'safety',
+    subtopic: 'prompt-injection',
+    difficulty: 'intermediate',
+    azure_bridge: {
+      openai_way: 'Input validation, output filtering, instruction hierarchy',
+      azure_equivalent: 'Same defenses plus Azure content filtering jailbreak detection',
+      key_differences: 'Azure content filtering includes jailbreak attempt detection.',
+      interview_phrase: 'Azure content filtering includes jailbreak detection, adding a layer of defense against prompt injection attacks.'
+    }
+  }
+]
+
+// Code Sample Library - 10 Real Interview Patterns
+interface CodeSample {
+  id: string
+  title: string
+  description: string
+  code: string
+  language: string
+  topic: string
+  walkthrough_questions: string[]
+  key_concepts: string[]
+  azure_notes: string
+}
+
+const CODE_SAMPLES: CodeSample[] = [
+  {
+    id: 'code-1',
+    title: 'Basic Chat Completion',
+    description: 'Simple chat completion request with system and user messages',
+    code: `from openai import OpenAI
+
+client = OpenAI()
+
+response = client.chat.completions.create(
+    model="gpt-4",
+    messages=[
+        {"role": "system", "content": "You are a helpful assistant."},
+        {"role": "user", "content": "What is the capital of France?"}
+    ],
+    temperature=0.7,
+    max_tokens=150
+)
+
+print(response.choices[0].message.content)`,
+    language: 'python',
+    topic: 'chat-completions',
+    walkthrough_questions: [
+      'What does each message role represent?',
+      'Why might you adjust the temperature parameter?',
+      'How would you handle the response in a production application?'
+    ],
+    key_concepts: ['message roles', 'temperature', 'max_tokens', 'response structure'],
+    azure_notes: 'In Azure, use AzureOpenAI client with azure_endpoint and api_key parameters. Model is specified via deployment name.'
+  },
+  {
+    id: 'code-2',
+    title: 'Streaming Response',
+    description: 'Handle streaming responses for real-time output',
+    code: `from openai import OpenAI
+
+client = OpenAI()
+
+stream = client.chat.completions.create(
+    model="gpt-4",
+    messages=[{"role": "user", "content": "Write a short poem"}],
+    stream=True
+)
+
+for chunk in stream:
+    if chunk.choices[0].delta.content:
+        print(chunk.choices[0].delta.content, end="", flush=True)`,
+    language: 'python',
+    topic: 'chat-completions',
+    walkthrough_questions: [
+      'Why use streaming instead of waiting for the full response?',
+      'What is the structure of each chunk in the stream?',
+      'How would you handle errors during streaming?'
+    ],
+    key_concepts: ['streaming', 'delta content', 'real-time output', 'chunk processing'],
+    azure_notes: 'Streaming works identically in Azure OpenAI. Same chunk structure and processing pattern.'
+  },
+  {
+    id: 'code-3',
+    title: 'Function Calling',
+    description: 'Define and handle function calls with the model',
+    code: `from openai import OpenAI
+import json
+
+client = OpenAI()
+
+tools = [{
+    "type": "function",
+    "function": {
+        "name": "get_weather",
+        "description": "Get current weather for a location",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "location": {"type": "string", "description": "City name"},
+                "unit": {"type": "string", "enum": ["celsius", "fahrenheit"]}
+            },
+            "required": ["location"]
+        }
+    }
+}]
+
+response = client.chat.completions.create(
+    model="gpt-4",
+    messages=[{"role": "user", "content": "What's the weather in Paris?"}],
+    tools=tools,
+    tool_choice="auto"
+)
+
+if response.choices[0].message.tool_calls:
+    tool_call = response.choices[0].message.tool_calls[0]
+    args = json.loads(tool_call.function.arguments)
+    print(f"Function: {tool_call.function.name}, Args: {args}")`,
+    language: 'python',
+    topic: 'function-calling',
+    walkthrough_questions: [
+      'How is the function schema defined?',
+      'What does tool_choice="auto" mean?',
+      'How would you execute the function and return results to the model?'
+    ],
+    key_concepts: ['tools array', 'JSON Schema', 'tool_choice', 'function arguments'],
+    azure_notes: 'Function calling is fully supported in Azure OpenAI with identical syntax.'
+  },
+  {
+    id: 'code-4',
+    title: 'Embeddings for Similarity',
+    description: 'Create embeddings and calculate similarity',
+    code: `from openai import OpenAI
+import numpy as np
+
+client = OpenAI()
+
+def get_embedding(text):
+    response = client.embeddings.create(
+        model="text-embedding-3-large",
+        input=text
+    )
+    return response.data[0].embedding
+
+def cosine_similarity(a, b):
+    return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
+
+text1 = "The cat sat on the mat"
+text2 = "A feline rested on the rug"
+text3 = "Python is a programming language"
+
+emb1 = get_embedding(text1)
+emb2 = get_embedding(text2)
+emb3 = get_embedding(text3)
+
+print(f"Similarity 1-2: {cosine_similarity(emb1, emb2):.3f}")
+print(f"Similarity 1-3: {cosine_similarity(emb1, emb3):.3f}")`,
+    language: 'python',
+    topic: 'embeddings-rag',
+    walkthrough_questions: [
+      'What is the output dimension of text-embedding-3-large?',
+      'Why use cosine similarity instead of Euclidean distance?',
+      'How would you use this for a RAG application?'
+    ],
+    key_concepts: ['embeddings', 'cosine similarity', 'vector comparison', 'semantic search'],
+    azure_notes: 'Use deployment name instead of model name. Azure AI Search can handle similarity calculations automatically.'
+  },
+  {
+    id: 'code-5',
+    title: 'RAG with Context Injection',
+    description: 'Retrieve relevant context and inject into prompt',
+    code: `from openai import OpenAI
+
+client = OpenAI()
+
+def retrieve_context(query, documents, top_k=3):
+    # In production, use vector DB like Pinecone, Azure AI Search
+    query_emb = get_embedding(query)
+    scores = [(doc, cosine_similarity(query_emb, get_embedding(doc))) 
+              for doc in documents]
+    return [doc for doc, _ in sorted(scores, key=lambda x: -x[1])[:top_k]]
+
+def rag_query(query, documents):
+    context = retrieve_context(query, documents)
+    
+    response = client.chat.completions.create(
+        model="gpt-4",
+        messages=[
+            {"role": "system", "content": f"""Answer based on this context:
+{chr(10).join(context)}
+
+If the answer isn't in the context, say so."""},
+            {"role": "user", "content": query}
+        ]
+    )
+    return response.choices[0].message.content`,
+    language: 'python',
+    topic: 'embeddings-rag',
+    walkthrough_questions: [
+      'What is the purpose of the system message in RAG?',
+      'How would you handle cases where context is not relevant?',
+      'What are the tradeoffs of including more vs less context?'
+    ],
+    key_concepts: ['context retrieval', 'prompt injection', 'grounding', 'hallucination prevention'],
+    azure_notes: 'Azure AI Search provides integrated RAG with On Your Data feature, handling retrieval automatically.'
+  },
+  {
+    id: 'code-6',
+    title: 'Structured Output with JSON Mode',
+    description: 'Force model to output valid JSON',
+    code: `from openai import OpenAI
+import json
+
+client = OpenAI()
+
+response = client.chat.completions.create(
+    model="gpt-4-turbo",
+    messages=[
+        {"role": "system", "content": "Extract entities as JSON with keys: name, type, description"},
+        {"role": "user", "content": "Apple Inc. is a technology company founded by Steve Jobs."}
+    ],
+    response_format={"type": "json_object"}
+)
+
+data = json.loads(response.choices[0].message.content)
+print(json.dumps(data, indent=2))`,
+    language: 'python',
+    topic: 'function-calling',
+    walkthrough_questions: [
+      'What does response_format json_object guarantee?',
+      'How is this different from asking the model to output JSON in the prompt?',
+      'What are the limitations of JSON mode?'
+    ],
+    key_concepts: ['JSON mode', 'structured output', 'response format', 'parsing'],
+    azure_notes: 'JSON mode is supported in Azure OpenAI with the same response_format parameter.'
+  },
+  {
+    id: 'code-7',
+    title: 'Error Handling and Retries',
+    description: 'Production-ready error handling with exponential backoff',
+    code: `from openai import OpenAI, RateLimitError, APIError
+import time
+
+client = OpenAI()
+
+def call_with_retry(messages, max_retries=3):
+    for attempt in range(max_retries):
+        try:
+            response = client.chat.completions.create(
+                model="gpt-4",
+                messages=messages
+            )
+            return response.choices[0].message.content
+        except RateLimitError as e:
+            wait_time = 2 ** attempt  # Exponential backoff
+            print(f"Rate limited. Waiting {wait_time}s...")
+            time.sleep(wait_time)
+        except APIError as e:
+            if attempt == max_retries - 1:
+                raise
+            print(f"API error: {e}. Retrying...")
+            time.sleep(1)
+    raise Exception("Max retries exceeded")`,
+    language: 'python',
+    topic: 'production',
+    walkthrough_questions: [
+      'Why use exponential backoff instead of fixed delays?',
+      'What other error types should you handle?',
+      'How would you add jitter to prevent thundering herd?'
+    ],
+    key_concepts: ['error handling', 'exponential backoff', 'rate limits', 'resilience'],
+    azure_notes: 'Same error handling patterns apply. Azure also returns Retry-After header for rate limits.'
+  },
+  {
+    id: 'code-8',
+    title: 'Assistants API Basic Flow',
+    description: 'Create assistant, thread, and run a conversation',
+    code: `from openai import OpenAI
+import time
+
+client = OpenAI()
+
+# Create an assistant
+assistant = client.beta.assistants.create(
+    name="Math Tutor",
+    instructions="You are a math tutor. Help students understand math concepts.",
+    model="gpt-4-turbo"
+)
+
+# Create a thread
+thread = client.beta.threads.create()
+
+# Add a message
+client.beta.threads.messages.create(
+    thread_id=thread.id,
+    role="user",
+    content="Explain the Pythagorean theorem"
+)
+
+# Run the assistant
+run = client.beta.threads.runs.create(
+    thread_id=thread.id,
+    assistant_id=assistant.id
+)
+
+# Poll for completion
+while run.status in ["queued", "in_progress"]:
+    time.sleep(1)
+    run = client.beta.threads.runs.retrieve(thread_id=thread.id, run_id=run.id)
+
+# Get messages
+messages = client.beta.threads.messages.list(thread_id=thread.id)
+print(messages.data[0].content[0].text.value)`,
+    language: 'python',
+    topic: 'assistants-api',
+    walkthrough_questions: [
+      'What is the lifecycle of a Run?',
+      'How would you handle tool calls in the Assistants API?',
+      'What are the benefits of threads over managing conversation history yourself?'
+    ],
+    key_concepts: ['assistants', 'threads', 'runs', 'polling', 'stateful conversations'],
+    azure_notes: 'Azure OpenAI Assistants API is in preview. Same concepts apply with Azure-specific client initialization.'
+  },
+  {
+    id: 'code-9',
+    title: 'Content Moderation',
+    description: 'Check content for policy violations',
+    code: `from openai import OpenAI
+
+client = OpenAI()
+
+def check_content(text):
+    response = client.moderations.create(input=text)
+    result = response.results[0]
+    
+    if result.flagged:
+        flagged_categories = [
+            cat for cat, flagged in result.categories.model_dump().items()
+            if flagged
+        ]
+        return {
+            "safe": False,
+            "categories": flagged_categories,
+            "scores": {cat: getattr(result.category_scores, cat) 
+                      for cat in flagged_categories}
+        }
+    return {"safe": True}
+
+# Example usage
+print(check_content("Hello, how are you?"))
+print(check_content("I want to hurt someone"))`,
+    language: 'python',
+    topic: 'safety',
+    walkthrough_questions: [
+      'What categories does the Moderation API check?',
+      'How would you use this in a production chat application?',
+      'What is the difference between flagged and category scores?'
+    ],
+    key_concepts: ['moderation', 'content filtering', 'safety categories', 'scores'],
+    azure_notes: 'Azure has built-in content filtering on all requests. Moderation API is also available for additional checks.'
+  },
+  {
+    id: 'code-10',
+    title: 'Fine-Tuning Data Preparation',
+    description: 'Prepare and validate training data for fine-tuning',
+    code: `import json
+
+def create_training_example(system, user, assistant):
+    return {
+        "messages": [
+            {"role": "system", "content": system},
+            {"role": "user", "content": user},
+            {"role": "assistant", "content": assistant}
+        ]
+    }
+
+# Create training data
+training_data = [
+    create_training_example(
+        "You are a customer service agent for TechCorp.",
+        "How do I reset my password?",
+        "To reset your password, go to Settings > Security > Reset Password. You'll receive an email with a reset link."
+    ),
+    create_training_example(
+        "You are a customer service agent for TechCorp.",
+        "What are your business hours?",
+        "TechCorp support is available Monday-Friday, 9 AM to 6 PM EST. For urgent issues, use our 24/7 chat."
+    )
+]
+
+# Write to JSONL file
+with open("training_data.jsonl", "w") as f:
+    for example in training_data:
+        f.write(json.dumps(example) + "\\n")
+
+# Validate format
+def validate_training_file(filepath):
+    with open(filepath) as f:
+        for i, line in enumerate(f):
+            try:
+                data = json.loads(line)
+                assert "messages" in data
+                assert len(data["messages"]) >= 2
+            except Exception as e:
+                print(f"Error on line {i+1}: {e}")
+                return False
+    return True`,
+    language: 'python',
+    topic: 'fine-tuning',
+    walkthrough_questions: [
+      'What is the required format for fine-tuning data?',
+      'How many examples are recommended for fine-tuning?',
+      'What makes a good fine-tuning example?'
+    ],
+    key_concepts: ['JSONL format', 'training data', 'validation', 'message structure'],
+    azure_notes: 'Same JSONL format. Upload file to Azure OpenAI resource before creating fine-tuning job.'
+  }
+]
+
+// Multi-LLM Support - Model configurations
+interface ModelConfig {
+  id: string
+  name: string
+  endpoint: string
+  deployment: string
+  description: string
+  bestFor: string[]
+}
+
+export const AVAILABLE_MODELS: ModelConfig[] = [
+  {
+    id: 'gpt-5.2',
+    name: 'GPT-5.2',
+    endpoint: 'east-us-2',
+    deployment: 'gpt-5.2',
+    description: 'Latest GPT model with advanced reasoning',
+    bestFor: ['complex questions', 'code generation', 'analysis']
+  },
+  {
+    id: 'gpt-5-pro',
+    name: 'GPT-5 Pro',
+    endpoint: 'sweden-central',
+    deployment: 'gpt-5-pro',
+    description: 'Professional tier with enhanced capabilities',
+    bestFor: ['detailed explanations', 'evaluation', 'feedback']
+  },
+  {
+    id: 'o3',
+    name: 'O3 Reasoning',
+    endpoint: 'sweden-central',
+    deployment: 'o3-3',
+    description: 'Specialized reasoning model',
+    bestFor: ['complex reasoning', 'multi-step problems', 'logic']
+  },
+  {
+    id: 'model-router',
+    name: 'Model Router',
+    endpoint: 'sweden-central',
+    deployment: 'model-router-2',
+    description: 'Intelligent routing to best model',
+    bestFor: ['general questions', 'varied tasks', 'cost optimization']
+  }
+]
+
+// Helper function to get question from bank based on topic and difficulty
+export const getQuestionFromBank = (
+  topic: string | null,
+  subtopic: string | null,
+  difficulty: 'beginner' | 'intermediate' | 'advanced',
+  usedQuestionIds: Set<string>
+): QuestionBankItem | null => {
+  let candidates = QUESTION_BANK.filter(q => !usedQuestionIds.has(q.id))
+  
+  if (topic) {
+    candidates = candidates.filter(q => q.topic === topic)
+  }
+  if (subtopic) {
+    candidates = candidates.filter(q => q.subtopic === subtopic)
+  }
+  
+  // Prefer matching difficulty, but fall back to any available
+  const byDifficulty = candidates.filter(q => q.difficulty === difficulty)
+  const pool = byDifficulty.length > 0 ? byDifficulty : candidates
+  
+  if (pool.length === 0) return null
+  return pool[Math.floor(Math.random() * pool.length)]
+}
+
+// Helper function to get code sample for topic
+export const getCodeSampleForTopic = (topic: string): CodeSample | null => {
+  const samples = CODE_SAMPLES.filter(s => s.topic === topic)
+  if (samples.length === 0) return null
+  return samples[Math.floor(Math.random() * samples.length)]
+}
+
 const ScoreCircle = ({ score, size = 120 }: { score: number; size?: number }) => {
   const circumference = 2 * Math.PI * 45
   const strokeDashoffset = circumference - (score / 100) * circumference
