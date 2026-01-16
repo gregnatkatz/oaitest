@@ -397,6 +397,150 @@ export const SCREENING_QUESTIONS: QuestionBankItem[] = [
       key_differences: 'Azure version is in preview with some feature limitations',
       interview_phrase: 'The Assistants API is great for complex conversational apps where you need persistent state and tool use.'
     }
+  },
+  {
+    id: 'screen-9',
+    question: 'What is a GPU and why is it important for AI/ML?',
+    hints: ['Parallel processing', 'Matrix operations', 'Training and inference'],
+    expected_topics: ['GPU', 'parallel processing', 'training', 'inference'],
+    code_snippet: null,
+    options: [
+      'A type of CPU that runs operating systems',
+      'A processor optimized for parallel matrix operations, essential for training and running AI models',
+      'A storage device for large datasets',
+      'A networking component for distributed computing'
+    ],
+    correct_option: 1,
+    blank_answer: 'parallel matrix operations processor',
+    topic: 'api-basics',
+    subtopic: 'authentication',
+    difficulty: 'beginner',
+    azure_bridge: {
+      openai_way: 'OpenAI manages GPU infrastructure for you',
+      azure_equivalent: 'Azure provides GPU VMs and managed AI services',
+      key_differences: 'With APIs you don\'t manage GPUs directly; Azure offers both managed and self-hosted options',
+      interview_phrase: 'GPUs excel at the parallel matrix multiplications that neural networks require, which is why they\'re essential for AI workloads.'
+    }
+  },
+  {
+    id: 'screen-10',
+    question: 'What is the transformer architecture?',
+    hints: ['Attention mechanism', 'Parallel processing', 'Foundation of modern LLMs'],
+    expected_topics: ['transformer', 'attention', 'self-attention', 'architecture'],
+    code_snippet: null,
+    options: [
+      'A type of electrical component',
+      'A neural network architecture using self-attention mechanisms that processes sequences in parallel',
+      'A data transformation pipeline for ETL',
+      'A model compression technique'
+    ],
+    correct_option: 1,
+    blank_answer: 'self-attention neural network architecture',
+    topic: 'api-basics',
+    subtopic: 'authentication',
+    difficulty: 'beginner',
+    azure_bridge: {
+      openai_way: 'GPT models are transformer-based',
+      azure_equivalent: 'Same transformer models available through Azure',
+      key_differences: 'No architectural difference - same models',
+      interview_phrase: 'The transformer architecture, introduced in the "Attention Is All You Need" paper, revolutionized NLP by enabling parallel processing of sequences.'
+    }
+  },
+  {
+    id: 'screen-11',
+    question: 'What is an embedding in machine learning?',
+    hints: ['Vector representation', 'Semantic meaning', 'Similarity search'],
+    expected_topics: ['embedding', 'vector', 'semantic', 'similarity'],
+    code_snippet: null,
+    options: [
+      'A way to embed images in documents',
+      'A dense vector representation that captures semantic meaning of text or data',
+      'A method to compress files',
+      'A technique for encrypting data'
+    ],
+    correct_option: 1,
+    blank_answer: 'dense vector semantic representation',
+    topic: 'embeddings-rag',
+    subtopic: 'embeddings',
+    difficulty: 'beginner',
+    azure_bridge: {
+      openai_way: 'text-embedding-3-small/large models',
+      azure_equivalent: 'Same embedding models in Azure OpenAI',
+      key_differences: 'Azure AI Search has built-in vector search for embeddings',
+      interview_phrase: 'Embeddings convert text into numerical vectors where similar meanings are close together in vector space.'
+    }
+  },
+  {
+    id: 'screen-12',
+    question: 'What is inference in machine learning?',
+    hints: ['Using a trained model', 'Making predictions', 'Production usage'],
+    expected_topics: ['inference', 'prediction', 'production', 'latency'],
+    code_snippet: null,
+    options: [
+      'The process of training a model on data',
+      'Using a trained model to make predictions on new data',
+      'Debugging code errors',
+      'Collecting training data'
+    ],
+    correct_option: 1,
+    blank_answer: 'using trained model for predictions',
+    topic: 'api-basics',
+    subtopic: 'authentication',
+    difficulty: 'beginner',
+    azure_bridge: {
+      openai_way: 'API calls are inference requests',
+      azure_equivalent: 'Same inference through Azure OpenAI endpoints',
+      key_differences: 'Azure offers PTU (Provisioned Throughput Units) for dedicated inference capacity',
+      interview_phrase: 'Every API call to GPT is an inference request - the model uses its trained weights to generate a response.'
+    }
+  },
+  {
+    id: 'screen-13',
+    question: 'What is model training vs fine-tuning?',
+    hints: ['Training from scratch vs adapting', 'Data requirements differ', 'Cost and time differ'],
+    expected_topics: ['training', 'fine-tuning', 'pre-training', 'adaptation'],
+    code_snippet: null,
+    options: [
+      'They are exactly the same thing',
+      'Training builds a model from scratch; fine-tuning adapts a pre-trained model to specific tasks',
+      'Fine-tuning is more expensive than training',
+      'Training only works with images, fine-tuning only with text'
+    ],
+    correct_option: 1,
+    blank_answer: 'training from scratch vs adapting pre-trained',
+    topic: 'fine-tuning',
+    subtopic: 'data-prep',
+    difficulty: 'beginner',
+    azure_bridge: {
+      openai_way: 'OpenAI offers fine-tuning, not pre-training',
+      azure_equivalent: 'Azure OpenAI also offers fine-tuning',
+      key_differences: 'Neither platform lets you train from scratch - you fine-tune existing models',
+      interview_phrase: 'Pre-training requires massive compute and data; fine-tuning lets you adapt existing models with much less resources.'
+    }
+  },
+  {
+    id: 'screen-14',
+    question: 'What is latency in the context of AI APIs?',
+    hints: ['Response time', 'User experience', 'Optimization target'],
+    expected_topics: ['latency', 'response time', 'performance', 'streaming'],
+    code_snippet: null,
+    options: [
+      'The accuracy of model predictions',
+      'The time between sending a request and receiving a response',
+      'The cost per API call',
+      'The number of tokens in a response'
+    ],
+    correct_option: 1,
+    blank_answer: 'time between request and response',
+    topic: 'api-basics',
+    subtopic: 'authentication',
+    difficulty: 'beginner',
+    azure_bridge: {
+      openai_way: 'Streaming reduces perceived latency',
+      azure_equivalent: 'Azure regions affect latency; choose closest region',
+      key_differences: 'Azure lets you deploy to specific regions for lower latency',
+      interview_phrase: 'Streaming responses significantly improves perceived latency by showing tokens as they\'re generated.'
+    }
   }
 ]
 
@@ -1857,6 +2001,391 @@ const QUESTION_BANK: QuestionBankItem[] = [
       key_differences: 'Azure provides built-in jailbreak detection.',
       interview_phrase: 'Azure Content Safety includes jailbreak detection that identifies common bypass patterns automatically.'
     }
+  },
+  // ============== Questions from OpenAI Interview Guides ==============
+  {
+    id: 'interview-1',
+    question: 'What is OpenAI\'s hiring mission according to their official interview guide?',
+    hints: ['Diverse perspectives', 'Safe AGI', 'All of humanity'],
+    expected_topics: ['mission', 'hiring', 'AGI', 'safety'],
+    code_snippet: null,
+    options: [
+      'To hire the most experienced AI researchers from top universities',
+      'To seek talented people with diverse perspectives passionate about building safe AGI for all of humanity',
+      'To recruit engineers who can ship products quickly',
+      'To find candidates with the highest technical credentials'
+    ],
+    correct_option: 1,
+    blank_answer: 'safe AGI for all of humanity',
+    topic: 'api-basics',
+    subtopic: 'mission',
+    difficulty: 'beginner',
+    azure_bridge: {
+      openai_way: 'Mission: Safe AGI for all of humanity',
+      azure_equivalent: 'Azure AI focuses on responsible AI and enterprise safety',
+      key_differences: 'OpenAI focuses on AGI research, Azure on enterprise AI deployment.',
+      interview_phrase: 'OpenAI\'s mission is building safe AGI that benefits all of humanity - this drives every technical decision.'
+    }
+  },
+  {
+    id: 'interview-2',
+    question: 'What does OpenAI look for in candidates according to their hiring values?',
+    hints: ['Not credential-driven', 'Unique background', 'Contribution'],
+    expected_topics: ['hiring', 'values', 'potential'],
+    code_snippet: null,
+    options: [
+      'Only PhD holders from top 10 universities',
+      'Candidates who understand their unique background and what they can contribute, not just credentials',
+      'At least 10 years of industry experience',
+      'Previous experience at FAANG companies only'
+    ],
+    correct_option: 1,
+    blank_answer: 'unique background and contribution',
+    topic: 'api-basics',
+    subtopic: 'mission',
+    difficulty: 'beginner',
+    azure_bridge: {
+      openai_way: 'Not credential-driven, values potential and contribution',
+      azure_equivalent: 'Microsoft values growth mindset and diverse backgrounds',
+      key_differences: 'Both value potential over credentials.',
+      interview_phrase: 'OpenAI is not credential-driven - they want to understand your unique background and contributions.'
+    }
+  },
+  {
+    id: 'interview-3',
+    question: 'What is "high potential" according to OpenAI\'s hiring philosophy?',
+    hints: ['Ramp up quickly', 'New domain', 'Produce results'],
+    expected_topics: ['potential', 'learning', 'results'],
+    code_snippet: null,
+    options: [
+      'Having the highest GPA in your graduating class',
+      'People who demonstrate ability to ramp up quickly in a new domain and produce results',
+      'Having published papers in top AI conferences',
+      'Working at a startup that achieved unicorn status'
+    ],
+    correct_option: 1,
+    blank_answer: 'ramp up quickly and produce results',
+    topic: 'api-basics',
+    subtopic: 'mission',
+    difficulty: 'beginner',
+    azure_bridge: {
+      openai_way: 'High potential = quick ramp-up + results',
+      azure_equivalent: 'Growth mindset and learning agility',
+      key_differences: 'Similar emphasis on learning ability.',
+      interview_phrase: 'High potential means demonstrating you can quickly learn new domains and deliver results.'
+    }
+  },
+  {
+    id: 'interview-4',
+    question: 'What is the typical structure of OpenAI\'s final interview round?',
+    hints: ['4-6 hours', '4-6 people', '1-2 days'],
+    expected_topics: ['interview process', 'final round', 'structure'],
+    code_snippet: null,
+    options: [
+      'A single 1-hour technical interview',
+      '4-6 hours of interviews with 4-6 people over 1-2 days',
+      'A take-home project only',
+      'A 30-minute phone screen'
+    ],
+    correct_option: 1,
+    blank_answer: '4-6 hours with 4-6 people',
+    topic: 'api-basics',
+    subtopic: 'mission',
+    difficulty: 'beginner',
+    azure_bridge: {
+      openai_way: '4-6 hours, 4-6 interviewers, 1-2 days',
+      azure_equivalent: 'Microsoft has similar multi-round interview loops',
+      key_differences: 'Both have comprehensive interview processes.',
+      interview_phrase: 'OpenAI final interviews are 4-6 hours with multiple interviewers designed to stretch you beyond your comfort zone.'
+    }
+  },
+  {
+    id: 'interview-5',
+    question: 'What does OpenAI evaluate in engineering interviews?',
+    hints: ['Well-designed solutions', 'Code quality', 'Performance', 'Test coverage'],
+    expected_topics: ['engineering', 'evaluation', 'code quality'],
+    code_snippet: null,
+    options: [
+      'Only algorithm complexity analysis',
+      'Well-designed solutions, high-quality code, optimal performance, and good test coverage',
+      'Speed of typing code',
+      'Memorization of API documentation'
+    ],
+    correct_option: 1,
+    blank_answer: 'design, quality, performance, tests',
+    topic: 'api-basics',
+    subtopic: 'best-practices',
+    difficulty: 'intermediate',
+    azure_bridge: {
+      openai_way: 'Design + quality + performance + tests',
+      azure_equivalent: 'Similar engineering excellence standards',
+      key_differences: 'Both emphasize production-quality code.',
+      interview_phrase: 'OpenAI looks for well-designed solutions with high-quality code, optimal performance, and good test coverage.'
+    }
+  },
+  {
+    id: 'interview-6',
+    question: 'What is the OpenAI Charter and why is it important for interviews?',
+    hints: ['Guiding principles', 'Safety', 'Benefit humanity'],
+    expected_topics: ['Charter', 'principles', 'safety'],
+    code_snippet: null,
+    options: [
+      'A legal document for investors',
+      'OpenAI\'s guiding principles for building safe AGI that benefits humanity - recommended reading for interviews',
+      'A technical specification for GPT models',
+      'An employee handbook'
+    ],
+    correct_option: 1,
+    blank_answer: 'guiding principles for safe AGI',
+    topic: 'api-basics',
+    subtopic: 'mission',
+    difficulty: 'beginner',
+    azure_bridge: {
+      openai_way: 'OpenAI Charter defines mission and safety principles',
+      azure_equivalent: 'Microsoft Responsible AI principles',
+      key_differences: 'OpenAI Charter focuses on AGI safety specifically.',
+      interview_phrase: 'The OpenAI Charter outlines our commitment to safe AGI development - it\'s essential reading for understanding our mission.'
+    }
+  },
+  {
+    id: 'interview-7',
+    question: 'What technical resources does OpenAI recommend for interview preparation?',
+    hints: ['Deep Learning Book', 'Spinning Up', 'Research publications'],
+    expected_topics: ['preparation', 'resources', 'deep learning'],
+    code_snippet: null,
+    options: [
+      'Only LeetCode problems',
+      'Deep Learning Book, Spinning Up in Deep RL, research publications, and blog posts',
+      'Only system design books',
+      'Only the OpenAI API documentation'
+    ],
+    correct_option: 1,
+    blank_answer: 'Deep Learning Book, Spinning Up, research',
+    topic: 'api-basics',
+    subtopic: 'best-practices',
+    difficulty: 'intermediate',
+    azure_bridge: {
+      openai_way: 'Deep Learning Book + Spinning Up + research papers',
+      azure_equivalent: 'Azure AI documentation + Microsoft Learn',
+      key_differences: 'OpenAI emphasizes research fundamentals.',
+      interview_phrase: 'For OpenAI interviews, study the Deep Learning Book, Spinning Up in Deep RL, and recent research publications.'
+    }
+  },
+  {
+    id: 'interview-8',
+    question: 'What coding problems are commonly asked in OpenAI technical screens?',
+    hints: ['Time-indexed data', 'Iterators', 'Caching', 'Concurrency'],
+    expected_topics: ['coding', 'interview', 'data structures'],
+    code_snippet: null,
+    options: [
+      'Only basic array manipulation',
+      'Time-indexed data handling, iterators with state, caching mechanisms, and concurrency patterns',
+      'Only sorting algorithms',
+      'Only SQL queries'
+    ],
+    correct_option: 1,
+    blank_answer: 'time-indexed data, iterators, caching',
+    topic: 'api-basics',
+    subtopic: 'best-practices',
+    difficulty: 'intermediate',
+    azure_bridge: {
+      openai_way: 'Practical problems: caching, iterators, time-series',
+      azure_equivalent: 'Similar practical coding challenges',
+      key_differences: 'OpenAI focuses on real-world engineering problems.',
+      interview_phrase: 'OpenAI coding interviews focus on practical problems like time-based key-value stores and iterator implementations.'
+    }
+  },
+  {
+    id: 'interview-9',
+    question: 'What system design topics should you prepare for OpenAI interviews?',
+    hints: ['Twitter feed', 'Notification system', 'ML serving'],
+    expected_topics: ['system design', 'scalability', 'ML infrastructure'],
+    code_snippet: null,
+    options: [
+      'Only database schema design',
+      'Large-scale systems like feeds, real-time notifications, and ML model serving platforms',
+      'Only frontend architecture',
+      'Only mobile app design'
+    ],
+    correct_option: 1,
+    blank_answer: 'feeds, notifications, ML serving',
+    topic: 'production',
+    subtopic: 'architecture',
+    difficulty: 'advanced',
+    azure_bridge: {
+      openai_way: 'Design feeds, notifications, ML serving',
+      azure_equivalent: 'Azure architecture patterns for similar systems',
+      key_differences: 'OpenAI focuses on AI-specific infrastructure.',
+      interview_phrase: 'System design at OpenAI covers ML model serving, real-time systems, and scalable infrastructure for AI workloads.'
+    }
+  },
+  {
+    id: 'interview-10',
+    question: 'What behavioral qualities does OpenAI evaluate in interviews?',
+    hints: ['Collaboration', 'Communication', 'Feedback', 'Mission alignment'],
+    expected_topics: ['behavioral', 'collaboration', 'communication'],
+    code_snippet: null,
+    options: [
+      'Only technical skills matter',
+      'Collaboration, effective communication, openness to feedback, and alignment with mission and values',
+      'Only leadership experience',
+      'Only previous startup experience'
+    ],
+    correct_option: 1,
+    blank_answer: 'collaboration, communication, feedback, mission',
+    topic: 'api-basics',
+    subtopic: 'mission',
+    difficulty: 'beginner',
+    azure_bridge: {
+      openai_way: 'Collaboration + communication + feedback + mission',
+      azure_equivalent: 'Microsoft values similar collaborative qualities',
+      key_differences: 'Both emphasize teamwork and communication.',
+      interview_phrase: 'OpenAI cares deeply about collaboration, communication, openness to feedback, and mission alignment.'
+    }
+  },
+  {
+    id: 'llm-fundamentals-1',
+    question: 'How do Large Language Models (LLMs) generate text?',
+    hints: ['Next token prediction', 'Probability distribution', 'Autoregressive'],
+    expected_topics: ['LLM', 'generation', 'transformers'],
+    code_snippet: null,
+    options: [
+      'By searching a database of pre-written responses',
+      'By predicting the next token based on probability distributions learned during training',
+      'By copying text from the internet',
+      'By following hard-coded rules'
+    ],
+    correct_option: 1,
+    blank_answer: 'next token prediction',
+    topic: 'chat-completions',
+    subtopic: 'models',
+    difficulty: 'beginner',
+    azure_bridge: {
+      openai_way: 'Autoregressive next-token prediction',
+      azure_equivalent: 'Same underlying mechanism',
+      key_differences: 'No differences in generation mechanism.',
+      interview_phrase: 'LLMs generate text autoregressively by predicting the most likely next token based on learned probability distributions.'
+    }
+  },
+  {
+    id: 'llm-fundamentals-2',
+    question: 'What is the transformer architecture and why is it important for LLMs?',
+    hints: ['Attention mechanism', 'Parallel processing', 'Long-range dependencies'],
+    expected_topics: ['transformer', 'attention', 'architecture'],
+    code_snippet: null,
+    options: [
+      'A type of database for storing embeddings',
+      'A neural network architecture using self-attention to process sequences in parallel and capture long-range dependencies',
+      'A data compression algorithm',
+      'A type of API endpoint'
+    ],
+    correct_option: 1,
+    blank_answer: 'self-attention for parallel processing',
+    topic: 'chat-completions',
+    subtopic: 'models',
+    difficulty: 'intermediate',
+    azure_bridge: {
+      openai_way: 'Transformer architecture with self-attention',
+      azure_equivalent: 'Same architecture in Azure OpenAI models',
+      key_differences: 'No differences in underlying architecture.',
+      interview_phrase: 'Transformers use self-attention to process entire sequences in parallel, enabling efficient training on massive datasets.'
+    }
+  },
+  {
+    id: 'llm-fundamentals-3',
+    question: 'What is the context window in LLMs and why does it matter?',
+    hints: ['Token limit', 'Memory', 'Input + output'],
+    expected_topics: ['context window', 'tokens', 'limitations'],
+    code_snippet: null,
+    options: [
+      'The physical window on your screen',
+      'The maximum number of tokens the model can process in a single request (input + output combined)',
+      'The time limit for API calls',
+      'The number of concurrent users'
+    ],
+    correct_option: 1,
+    blank_answer: 'maximum tokens per request',
+    topic: 'chat-completions',
+    subtopic: 'parameters',
+    difficulty: 'beginner',
+    azure_bridge: {
+      openai_way: 'Context window varies by model (4K to 128K+)',
+      azure_equivalent: 'Same context windows in Azure OpenAI',
+      key_differences: 'No differences in context window sizes.',
+      interview_phrase: 'Context window determines how much information the model can consider - GPT-4 Turbo supports 128K tokens.'
+    }
+  },
+  {
+    id: 'llm-fundamentals-4',
+    question: 'What is tokenization and why is it important?',
+    hints: ['Text to numbers', 'BPE', 'Subword units'],
+    expected_topics: ['tokenization', 'BPE', 'encoding'],
+    code_snippet: null,
+    options: [
+      'Converting API keys to secure tokens',
+      'Breaking text into subword units that the model can process, using algorithms like BPE',
+      'Encrypting user data',
+      'Compressing images'
+    ],
+    correct_option: 1,
+    blank_answer: 'subword units with BPE',
+    topic: 'chat-completions',
+    subtopic: 'parameters',
+    difficulty: 'intermediate',
+    azure_bridge: {
+      openai_way: 'tiktoken library for tokenization',
+      azure_equivalent: 'Same tokenization in Azure OpenAI',
+      key_differences: 'No differences in tokenization.',
+      interview_phrase: 'Tokenization converts text to numerical tokens - understanding token counts is crucial for cost estimation and context management.'
+    }
+  },
+  {
+    id: 'agents-1',
+    question: 'What are AI agents and how do they differ from simple LLM calls?',
+    hints: ['Autonomous', 'Tool use', 'Multi-step reasoning'],
+    expected_topics: ['agents', 'autonomy', 'tools'],
+    code_snippet: null,
+    options: [
+      'Agents are just faster LLM calls',
+      'Agents are autonomous systems that can use tools, make decisions, and execute multi-step tasks without human intervention',
+      'Agents are a type of embedding model',
+      'Agents are only for customer service chatbots'
+    ],
+    correct_option: 1,
+    blank_answer: 'autonomous multi-step tool use',
+    topic: 'function-calling',
+    subtopic: 'tools',
+    difficulty: 'intermediate',
+    azure_bridge: {
+      openai_way: 'Agents API for autonomous task execution',
+      azure_equivalent: 'Azure AI Agent Service (preview)',
+      key_differences: 'Azure provides managed agent infrastructure.',
+      interview_phrase: 'AI agents go beyond simple Q&A - they autonomously plan, use tools, and execute complex multi-step workflows.'
+    }
+  },
+  {
+    id: 'agents-2',
+    question: 'What is the ReAct pattern in AI agents?',
+    hints: ['Reasoning', 'Acting', 'Observation loop'],
+    expected_topics: ['ReAct', 'reasoning', 'action'],
+    code_snippet: null,
+    options: [
+      'A JavaScript framework for building UIs',
+      'A pattern where agents alternate between Reasoning about the task, Acting with tools, and observing results',
+      'A type of neural network layer',
+      'A database query pattern'
+    ],
+    correct_option: 1,
+    blank_answer: 'Reason-Act-Observe loop',
+    topic: 'function-calling',
+    subtopic: 'tools',
+    difficulty: 'advanced',
+    azure_bridge: {
+      openai_way: 'ReAct pattern with function calling',
+      azure_equivalent: 'Same pattern in Azure OpenAI',
+      key_differences: 'No differences in pattern implementation.',
+      interview_phrase: 'ReAct enables agents to reason about tasks, take actions via tools, and observe results in an iterative loop.'
+    }
   }
 ]
 
@@ -3075,11 +3604,11 @@ const SessionSummaryScreen = ({
         </Card>
 
         <div className="flex gap-4">
-          <Button variant="outline" className="flex-1 border-zinc-700 h-12" onClick={onContinue}>
+          <Button variant="outline" className="flex-1 border-zinc-700 h-12 bg-transparent text-white hover:bg-zinc-800" onClick={onContinue}>
             <RefreshCw className="w-4 h-4 mr-2" />
             Practice More
           </Button>
-          <Button className="flex-1 h-12 bg-gradient-to-r from-orange-500 to-amber-500" onClick={onFinish}>
+          <Button className="flex-1 h-12 bg-gradient-to-r from-orange-500 to-amber-500 text-white" onClick={onFinish}>
             Done for Now
             <CheckCircle className="w-4 h-4 ml-2" />
           </Button>
@@ -3105,6 +3634,7 @@ export default function App() {
   const [topicMastery, setTopicMastery] = useState<TopicMastery>({})
   const [currentTopic, setCurrentTopic] = useState<string>('')
   const [currentSubtopic, setCurrentSubtopic] = useState<string>('')
+  const [usedQuestionIds, setUsedQuestionIds] = useState<Set<string>>(new Set())
     const [userProgress, setUserProgress] = useState<UserProgress>({
       totalQuestionsAnswered: 0,
       currentStreak: 0,
@@ -3179,6 +3709,7 @@ export default function App() {
     setTotalScore(0)
     setAvgScore(0)
     setTimeLeft(duration * 90)
+    setUsedQuestionIds(new Set()) // Reset used questions for new session
     setScreen('question')
     await generateQuestion(type)
   }
@@ -3220,11 +3751,19 @@ export default function App() {
     let availableQuestions = QUESTION_BANK.filter(q => {
       if (topic && q.topic !== topic) return false
       if (subtopic && q.subtopic !== subtopic) return false
+      // PREVENT REPETITION: Exclude already-used questions in this session
+      if (usedQuestionIds.has(q.id)) return false
       return true
     })
 
-    // If no topic-specific questions, use all questions
+    // If no topic-specific questions, use all unused questions
     if (availableQuestions.length === 0) {
+      availableQuestions = QUESTION_BANK.filter(q => !usedQuestionIds.has(q.id))
+    }
+
+    // If all questions used, reset and allow repeats (fallback for long sessions)
+    if (availableQuestions.length === 0) {
+      setUsedQuestionIds(new Set())
       availableQuestions = [...QUESTION_BANK]
     }
 
@@ -3245,6 +3784,9 @@ export default function App() {
     // Pick a random question from the filtered bank
     const randomIndex = Math.floor(Math.random() * availableQuestions.length)
     const bankQuestion = availableQuestions[randomIndex]
+
+    // Track this question as used
+    setUsedQuestionIds(prev => new Set([...prev, bankQuestion.id]))
 
     // Convert bank question to the format expected by QuestionScreen
     const question: Question = {
@@ -3369,6 +3911,7 @@ export default function App() {
     setTotalScore(0)
     setAvgScore(0)
     setTimeLeft(20 * 90)
+    setUsedQuestionIds(new Set()) // Reset used questions for new session
     setScreen('question')
     generateQuestion('technical', topicId, subtopicId)
   }
