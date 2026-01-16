@@ -223,6 +223,7 @@ export const SCREENING_QUESTIONS: QuestionBankItem[] = [
     topic: 'api-basics',
     subtopic: 'authentication',
     difficulty: 'beginner',
+    bank: 'easy',
     azure_bridge: {
       openai_way: 'GPT models use transformer architecture',
       azure_equivalent: 'Same models available through Azure OpenAI',
@@ -247,6 +248,7 @@ export const SCREENING_QUESTIONS: QuestionBankItem[] = [
     topic: 'chat-completions',
     subtopic: 'messages',
     difficulty: 'beginner',
+    bank: 'easy',
     azure_bridge: {
       openai_way: 'Prompt engineering techniques apply universally',
       azure_equivalent: 'Same techniques work in Azure OpenAI',
@@ -271,6 +273,7 @@ export const SCREENING_QUESTIONS: QuestionBankItem[] = [
     topic: 'fine-tuning',
     subtopic: 'data-prep',
     difficulty: 'beginner',
+    bank: 'easy',
     azure_bridge: {
       openai_way: 'Both available through OpenAI API',
       azure_equivalent: 'Both available through Azure OpenAI',
@@ -295,6 +298,7 @@ export const SCREENING_QUESTIONS: QuestionBankItem[] = [
     topic: 'chat-completions',
     subtopic: 'tokens',
     difficulty: 'beginner',
+    bank: 'easy',
     azure_bridge: {
       openai_way: 'Tokenization using tiktoken library',
       azure_equivalent: 'Same tokenization, same token counts',
@@ -319,6 +323,7 @@ export const SCREENING_QUESTIONS: QuestionBankItem[] = [
     topic: 'embeddings-rag',
     subtopic: 'retrieval',
     difficulty: 'beginner',
+    bank: 'easy',
     azure_bridge: {
       openai_way: 'Build RAG with embeddings API + vector DB',
       azure_equivalent: 'Azure AI Search provides integrated RAG with On Your Data',
@@ -343,6 +348,7 @@ export const SCREENING_QUESTIONS: QuestionBankItem[] = [
     topic: 'safety',
     subtopic: 'responsible-ai',
     difficulty: 'beginner',
+    bank: 'easy',
     azure_bridge: {
       openai_way: 'Use RAG, lower temperature, ask model to cite sources',
       azure_equivalent: 'Same techniques plus Azure content filtering',
@@ -367,6 +373,7 @@ export const SCREENING_QUESTIONS: QuestionBankItem[] = [
     topic: 'chat-completions',
     subtopic: 'tokens',
     difficulty: 'beginner',
+    bank: 'easy',
     azure_bridge: {
       openai_way: 'GPT-4 Turbo: 128K tokens, GPT-4: 8K/32K',
       azure_equivalent: 'Same context windows for same models',
@@ -391,6 +398,7 @@ export const SCREENING_QUESTIONS: QuestionBankItem[] = [
     topic: 'assistants-api',
     subtopic: 'assistants',
     difficulty: 'beginner',
+    bank: 'easy',
     azure_bridge: {
       openai_way: 'Full Assistants API with threads, runs, tools',
       azure_equivalent: 'Azure OpenAI Assistants API (preview)',
@@ -415,6 +423,7 @@ export const SCREENING_QUESTIONS: QuestionBankItem[] = [
     topic: 'api-basics',
     subtopic: 'authentication',
     difficulty: 'beginner',
+    bank: 'easy',
     azure_bridge: {
       openai_way: 'OpenAI manages GPU infrastructure for you',
       azure_equivalent: 'Azure provides GPU VMs and managed AI services',
@@ -439,6 +448,7 @@ export const SCREENING_QUESTIONS: QuestionBankItem[] = [
     topic: 'api-basics',
     subtopic: 'authentication',
     difficulty: 'beginner',
+    bank: 'easy',
     azure_bridge: {
       openai_way: 'GPT models are transformer-based',
       azure_equivalent: 'Same transformer models available through Azure',
@@ -463,6 +473,7 @@ export const SCREENING_QUESTIONS: QuestionBankItem[] = [
     topic: 'embeddings-rag',
     subtopic: 'embeddings',
     difficulty: 'beginner',
+    bank: 'easy',
     azure_bridge: {
       openai_way: 'text-embedding-3-small/large models',
       azure_equivalent: 'Same embedding models in Azure OpenAI',
@@ -487,6 +498,7 @@ export const SCREENING_QUESTIONS: QuestionBankItem[] = [
     topic: 'api-basics',
     subtopic: 'authentication',
     difficulty: 'beginner',
+    bank: 'easy',
     azure_bridge: {
       openai_way: 'API calls are inference requests',
       azure_equivalent: 'Same inference through Azure OpenAI endpoints',
@@ -511,6 +523,7 @@ export const SCREENING_QUESTIONS: QuestionBankItem[] = [
     topic: 'fine-tuning',
     subtopic: 'data-prep',
     difficulty: 'beginner',
+    bank: 'easy',
     azure_bridge: {
       openai_way: 'OpenAI offers fine-tuning, not pre-training',
       azure_equivalent: 'Azure OpenAI also offers fine-tuning',
@@ -535,6 +548,7 @@ export const SCREENING_QUESTIONS: QuestionBankItem[] = [
     topic: 'api-basics',
     subtopic: 'authentication',
     difficulty: 'beginner',
+    bank: 'easy',
     azure_bridge: {
       openai_way: 'Streaming reduces perceived latency',
       azure_equivalent: 'Azure regions affect latency; choose closest region',
@@ -818,12 +832,33 @@ interface QuestionBankItem {
   topic: string
   subtopic: string
   difficulty: 'beginner' | 'intermediate' | 'advanced'
+  bank: 'easy' | 'medium' | 'hard' | 'code_review' | 'advanced'
   azure_bridge: {
     openai_way: string
     azure_equivalent: string
     key_differences: string
     interview_phrase: string
   }
+}
+
+// Bank selection based on user progress
+const getBankForProgress = (progress: UserProgress): ('easy' | 'medium' | 'hard' | 'code_review' | 'advanced')[] => {
+  const { totalQuestionsAnswered, avgScore } = progress
+  
+  // New users: Easy only
+  if (totalQuestionsAnswered < 10) {
+    return ['easy']
+  }
+  // After 10 questions with 60%+: Add Medium
+  if (totalQuestionsAnswered < 20 || avgScore < 60) {
+    return ['easy', 'medium']
+  }
+  // After 20 questions with 70%+: Add Hard + Code Review
+  if (totalQuestionsAnswered < 30 || avgScore < 70) {
+    return ['medium', 'hard', 'code_review']
+  }
+  // After 30 questions with 80%+: All banks including Advanced
+  return ['hard', 'code_review', 'advanced']
 }
 
 const QUESTION_BANK: QuestionBankItem[] = [
@@ -845,6 +880,7 @@ const QUESTION_BANK: QuestionBankItem[] = [
     topic: 'api-basics',
     subtopic: 'authentication',
     difficulty: 'beginner',
+    bank: 'easy',
     azure_bridge: {
       openai_way: 'Authorization: Bearer sk-xxx header',
       azure_equivalent: 'api-key: xxx header OR Azure AD token',
@@ -869,6 +905,7 @@ const QUESTION_BANK: QuestionBankItem[] = [
     topic: 'api-basics',
     subtopic: 'authentication',
     difficulty: 'beginner',
+    bank: 'easy',
     azure_bridge: {
       openai_way: 'Environment variables (OPENAI_API_KEY)',
       azure_equivalent: 'Azure Key Vault, Managed Identity, or environment variables',
@@ -894,6 +931,7 @@ const QUESTION_BANK: QuestionBankItem[] = [
     topic: 'chat-completions',
     subtopic: 'messages',
     difficulty: 'beginner',
+    bank: 'easy',
     azure_bridge: {
       openai_way: 'messages: [{role: "system"}, {role: "user"}, {role: "assistant"}]',
       azure_equivalent: 'Identical message structure in Azure OpenAI',
@@ -918,6 +956,7 @@ const QUESTION_BANK: QuestionBankItem[] = [
     topic: 'chat-completions',
     subtopic: 'messages',
     difficulty: 'beginner',
+    bank: 'easy',
     azure_bridge: {
       openai_way: 'System message sets assistant behavior',
       azure_equivalent: 'Same functionality, plus Azure content filtering respects system message',
@@ -943,6 +982,7 @@ const QUESTION_BANK: QuestionBankItem[] = [
     topic: 'chat-completions',
     subtopic: 'parameters',
     difficulty: 'beginner',
+    bank: 'easy',
     azure_bridge: {
       openai_way: 'temperature: 0.7 (0-2 range)',
       azure_equivalent: 'Identical parameter and behavior',
@@ -967,6 +1007,7 @@ const QUESTION_BANK: QuestionBankItem[] = [
     topic: 'chat-completions',
     subtopic: 'parameters',
     difficulty: 'intermediate',
+    bank: 'medium',
     azure_bridge: {
       openai_way: 'temperature OR top_p (not both recommended)',
       azure_equivalent: 'Same parameters and recommendation',
@@ -992,6 +1033,7 @@ const QUESTION_BANK: QuestionBankItem[] = [
     topic: 'function-calling',
     subtopic: 'tool-definition',
     difficulty: 'beginner',
+    bank: 'easy',
     azure_bridge: {
       openai_way: 'tools: [{type: "function", function: {name, description, parameters}}]',
       azure_equivalent: 'Identical tool definition format',
@@ -1016,6 +1058,7 @@ const QUESTION_BANK: QuestionBankItem[] = [
     topic: 'function-calling',
     subtopic: 'tool-definition',
     difficulty: 'intermediate',
+    bank: 'medium',
     azure_bridge: {
       openai_way: 'tool_choice: "auto" | "none" | {type: "function", function: {name}}',
       azure_equivalent: 'Same tool_choice options',
@@ -1041,6 +1084,7 @@ const QUESTION_BANK: QuestionBankItem[] = [
     topic: 'embeddings-rag',
     subtopic: 'embeddings',
     difficulty: 'beginner',
+    bank: 'easy',
     azure_bridge: {
       openai_way: 'POST /embeddings with model: "text-embedding-3-large"',
       azure_equivalent: 'POST /deployments/{deployment}/embeddings',
@@ -1065,6 +1109,7 @@ const QUESTION_BANK: QuestionBankItem[] = [
     topic: 'embeddings-rag',
     subtopic: 'chunking',
     difficulty: 'intermediate',
+    bank: 'medium',
     azure_bridge: {
       openai_way: 'Manual chunking with tiktoken',
       azure_equivalent: 'Azure AI Search has built-in chunking, or use manual chunking',
@@ -1090,6 +1135,7 @@ const QUESTION_BANK: QuestionBankItem[] = [
     topic: 'assistants-api',
     subtopic: 'assistants',
     difficulty: 'beginner',
+    bank: 'easy',
     azure_bridge: {
       openai_way: 'Assistants API with threads and runs',
       azure_equivalent: 'Azure OpenAI Assistants API (preview)',
@@ -1114,6 +1160,7 @@ const QUESTION_BANK: QuestionBankItem[] = [
     topic: 'assistants-api',
     subtopic: 'runs',
     difficulty: 'intermediate',
+    bank: 'medium',
     azure_bridge: {
       openai_way: 'Poll run status or use streaming',
       azure_equivalent: 'Same polling/streaming patterns',
@@ -1139,6 +1186,7 @@ const QUESTION_BANK: QuestionBankItem[] = [
     topic: 'fine-tuning',
     subtopic: 'data-prep',
     difficulty: 'beginner',
+    bank: 'easy',
     azure_bridge: {
       openai_way: 'JSONL with messages array',
       azure_equivalent: 'Same JSONL format',
@@ -1163,6 +1211,7 @@ const QUESTION_BANK: QuestionBankItem[] = [
     topic: 'fine-tuning',
     subtopic: 'hyperparameters',
     difficulty: 'intermediate',
+    bank: 'medium',
     azure_bridge: {
       openai_way: 'n_epochs, learning_rate_multiplier, batch_size',
       azure_equivalent: 'Same hyperparameters available',
@@ -1187,6 +1236,7 @@ const QUESTION_BANK: QuestionBankItem[] = [
     topic: 'fine-tuning',
     subtopic: 'data-prep',
     difficulty: 'intermediate',
+    bank: 'medium',
     azure_bridge: {
       openai_way: '50-100 minimum, more is better',
       azure_equivalent: 'Same recommendations',
@@ -1212,6 +1262,7 @@ const QUESTION_BANK: QuestionBankItem[] = [
     topic: 'production',
     subtopic: 'fallbacks',
     difficulty: 'intermediate',
+    bank: 'medium',
     azure_bridge: {
       openai_way: 'Exponential backoff, check Retry-After header',
       azure_equivalent: 'Same pattern, plus Azure API Management for advanced throttling',
@@ -1236,6 +1287,7 @@ const QUESTION_BANK: QuestionBankItem[] = [
     topic: 'production',
     subtopic: 'caching',
     difficulty: 'advanced',
+    bank: 'hard',
     azure_bridge: {
       openai_way: 'Custom semantic cache implementation',
       azure_equivalent: 'Azure API Management semantic caching or custom implementation',
@@ -1261,6 +1313,7 @@ const QUESTION_BANK: QuestionBankItem[] = [
     topic: 'safety',
     subtopic: 'moderation',
     difficulty: 'beginner',
+    bank: 'easy',
     azure_bridge: {
       openai_way: 'POST /moderations endpoint',
       azure_equivalent: 'Built-in content filtering on all requests + optional Moderation API',
@@ -1285,6 +1338,7 @@ const QUESTION_BANK: QuestionBankItem[] = [
     topic: 'safety',
     subtopic: 'prompt-injection',
     difficulty: 'intermediate',
+    bank: 'medium',
     azure_bridge: {
       openai_way: 'Input validation, output filtering, instruction hierarchy',
       azure_equivalent: 'Same defenses plus Azure content filtering jailbreak detection',
@@ -1310,6 +1364,7 @@ const QUESTION_BANK: QuestionBankItem[] = [
     topic: 'api-basics',
     subtopic: 'endpoints',
     difficulty: 'beginner',
+    bank: 'easy',
     azure_bridge: {
       openai_way: '/chat/completions for chat models, /completions for legacy',
       azure_equivalent: 'Same endpoints available in Azure OpenAI',
@@ -1334,6 +1389,7 @@ const QUESTION_BANK: QuestionBankItem[] = [
     topic: 'api-basics',
     subtopic: 'rate-limits',
     difficulty: 'beginner',
+    bank: 'easy',
     azure_bridge: {
       openai_way: '429 with Retry-After header',
       azure_equivalent: 'Same 429 response with Retry-After',
@@ -1358,6 +1414,7 @@ const QUESTION_BANK: QuestionBankItem[] = [
     topic: 'api-basics',
     subtopic: 'authentication',
     difficulty: 'intermediate',
+    bank: 'medium',
     azure_bridge: {
       openai_way: 'OpenAI-Organization header',
       azure_equivalent: 'Azure uses subscriptions and resource groups for billing separation',
@@ -1382,6 +1439,7 @@ const QUESTION_BANK: QuestionBankItem[] = [
     topic: 'api-basics',
     subtopic: 'streaming',
     difficulty: 'beginner',
+    bank: 'easy',
     azure_bridge: {
       openai_way: 'stream: true returns SSE chunks',
       azure_equivalent: 'Identical streaming support',
@@ -1407,6 +1465,7 @@ const QUESTION_BANK: QuestionBankItem[] = [
     topic: 'chat-completions',
     subtopic: 'parameters',
     difficulty: 'beginner',
+    bank: 'easy',
     azure_bridge: {
       openai_way: 'max_tokens limits response length',
       azure_equivalent: 'max_tokens or max_completion_tokens for newer models',
@@ -1431,6 +1490,7 @@ const QUESTION_BANK: QuestionBankItem[] = [
     topic: 'chat-completions',
     subtopic: 'parameters',
     difficulty: 'intermediate',
+    bank: 'medium',
     azure_bridge: {
       openai_way: 'stop: ["\\n", "END"]',
       azure_equivalent: 'Identical stop parameter',
@@ -1455,6 +1515,7 @@ const QUESTION_BANK: QuestionBankItem[] = [
     topic: 'chat-completions',
     subtopic: 'parameters',
     difficulty: 'intermediate',
+    bank: 'medium',
     azure_bridge: {
       openai_way: 'presence_penalty: -2.0 to 2.0',
       azure_equivalent: 'Identical parameter',
@@ -1479,6 +1540,7 @@ const QUESTION_BANK: QuestionBankItem[] = [
     topic: 'chat-completions',
     subtopic: 'parameters',
     difficulty: 'advanced',
+    bank: 'hard',
     azure_bridge: {
       openai_way: 'frequency_penalty increases with each occurrence',
       azure_equivalent: 'Identical behavior',
@@ -1503,6 +1565,7 @@ const QUESTION_BANK: QuestionBankItem[] = [
     topic: 'chat-completions',
     subtopic: 'parameters',
     difficulty: 'intermediate',
+    bank: 'medium',
     azure_bridge: {
       openai_way: 'response_format: {type: "json_object"}',
       azure_equivalent: 'Same JSON mode support',
@@ -1528,6 +1591,7 @@ const QUESTION_BANK: QuestionBankItem[] = [
     topic: 'function-calling',
     subtopic: 'execution',
     difficulty: 'beginner',
+    bank: 'easy',
     azure_bridge: {
       openai_way: 'response.choices[0].message.tool_calls',
       azure_equivalent: 'Identical response structure',
@@ -1552,6 +1616,7 @@ const QUESTION_BANK: QuestionBankItem[] = [
     topic: 'function-calling',
     subtopic: 'execution',
     difficulty: 'intermediate',
+    bank: 'medium',
     azure_bridge: {
       openai_way: '{role: "tool", tool_call_id: "...", content: "result"}',
       azure_equivalent: 'Identical message format',
@@ -1576,6 +1641,7 @@ const QUESTION_BANK: QuestionBankItem[] = [
     topic: 'function-calling',
     subtopic: 'advanced',
     difficulty: 'intermediate',
+    bank: 'medium',
     azure_bridge: {
       openai_way: 'Multiple tool_calls in response.choices[0].message.tool_calls',
       azure_equivalent: 'Same parallel calling support',
@@ -1600,6 +1666,7 @@ const QUESTION_BANK: QuestionBankItem[] = [
     topic: 'function-calling',
     subtopic: 'advanced',
     difficulty: 'advanced',
+    bank: 'hard',
     azure_bridge: {
       openai_way: 'strict: true in function definition',
       azure_equivalent: 'Structured Outputs supported in Azure OpenAI',
@@ -1625,6 +1692,7 @@ const QUESTION_BANK: QuestionBankItem[] = [
     topic: 'embeddings-rag',
     subtopic: 'similarity',
     difficulty: 'intermediate',
+    bank: 'medium',
     azure_bridge: {
       openai_way: 'Cosine similarity for vector comparison',
       azure_equivalent: 'Azure AI Search uses cosine similarity by default',
@@ -1649,6 +1717,7 @@ const QUESTION_BANK: QuestionBankItem[] = [
     topic: 'embeddings-rag',
     subtopic: 'embeddings',
     difficulty: 'advanced',
+    bank: 'hard',
     azure_bridge: {
       openai_way: 'dimensions: 256/512/1024/1536/3072',
       azure_equivalent: 'Same dimensions parameter support',
@@ -1668,6 +1737,7 @@ const QUESTION_BANK: QuestionBankItem[] = [
     topic: 'embeddings-rag',
     subtopic: 'retrieval',
     difficulty: 'intermediate',
+    bank: 'medium',
     azure_bridge: {
       openai_way: 'Custom implementation combining BM25 + vectors',
       azure_equivalent: 'Azure AI Search has built-in hybrid search',
@@ -1687,6 +1757,7 @@ const QUESTION_BANK: QuestionBankItem[] = [
     topic: 'embeddings-rag',
     subtopic: 'retrieval',
     difficulty: 'advanced',
+    bank: 'hard',
     azure_bridge: {
       openai_way: 'Custom reranking with cross-encoder models',
       azure_equivalent: 'Built-in semantic ranker in Azure AI Search',
@@ -1707,6 +1778,7 @@ const QUESTION_BANK: QuestionBankItem[] = [
     topic: 'assistants-api',
     subtopic: 'threads',
     difficulty: 'beginner',
+    bank: 'easy',
     azure_bridge: {
       openai_way: 'client.beta.threads.create()',
       azure_equivalent: 'Same Thread API in Azure OpenAI',
@@ -1726,6 +1798,7 @@ const QUESTION_BANK: QuestionBankItem[] = [
     topic: 'assistants-api',
     subtopic: 'tools',
     difficulty: 'intermediate',
+    bank: 'medium',
     azure_bridge: {
       openai_way: 'code_interpreter, file_search, function tools',
       azure_equivalent: 'Same tools available in Azure preview',
@@ -1745,6 +1818,7 @@ const QUESTION_BANK: QuestionBankItem[] = [
     topic: 'assistants-api',
     subtopic: 'runs',
     difficulty: 'intermediate',
+    bank: 'medium',
     azure_bridge: {
       openai_way: 'client.beta.threads.runs.create()',
       azure_equivalent: 'Same Run API',
@@ -1764,6 +1838,7 @@ const QUESTION_BANK: QuestionBankItem[] = [
     topic: 'assistants-api',
     subtopic: 'runs',
     difficulty: 'advanced',
+    bank: 'hard',
     azure_bridge: {
       openai_way: 'client.beta.threads.runs.submit_tool_outputs()',
       azure_equivalent: 'Same tool output submission',
@@ -1784,6 +1859,7 @@ const QUESTION_BANK: QuestionBankItem[] = [
     topic: 'fine-tuning',
     subtopic: 'training',
     difficulty: 'intermediate',
+    bank: 'medium',
     azure_bridge: {
       openai_way: 'validation_file parameter in fine-tuning job',
       azure_equivalent: 'Same validation file support',
@@ -1803,6 +1879,7 @@ const QUESTION_BANK: QuestionBankItem[] = [
     topic: 'fine-tuning',
     subtopic: 'training',
     difficulty: 'intermediate',
+    bank: 'medium',
     azure_bridge: {
       openai_way: 'hyperparameters: {n_epochs, learning_rate_multiplier, batch_size}',
       azure_equivalent: 'Same hyperparameter options',
@@ -1822,6 +1899,7 @@ const QUESTION_BANK: QuestionBankItem[] = [
     topic: 'fine-tuning',
     subtopic: 'decision',
     difficulty: 'advanced',
+    bank: 'hard',
     azure_bridge: {
       openai_way: 'Fine-tuning for style, few-shot for knowledge',
       azure_equivalent: 'Same decision framework',
@@ -1841,6 +1919,7 @@ const QUESTION_BANK: QuestionBankItem[] = [
     topic: 'fine-tuning',
     subtopic: 'management',
     difficulty: 'beginner',
+    bank: 'easy',
     azure_bridge: {
       openai_way: 'suffix: "my-custom-model"',
       azure_equivalent: 'Custom deployment name in Azure',
@@ -1861,6 +1940,7 @@ const QUESTION_BANK: QuestionBankItem[] = [
     topic: 'production',
     subtopic: 'optimization',
     difficulty: 'intermediate',
+    bank: 'medium',
     azure_bridge: {
       openai_way: 'Batch API with JSONL input files',
       azure_equivalent: 'Azure OpenAI Batch API (preview)',
@@ -1880,6 +1960,7 @@ const QUESTION_BANK: QuestionBankItem[] = [
     topic: 'production',
     subtopic: 'fallbacks',
     difficulty: 'intermediate',
+    bank: 'medium',
     azure_bridge: {
       openai_way: 'Custom fallback logic',
       azure_equivalent: 'Azure API Management policies for fallbacks',
@@ -1899,6 +1980,7 @@ const QUESTION_BANK: QuestionBankItem[] = [
     topic: 'production',
     subtopic: 'monitoring',
     difficulty: 'intermediate',
+    bank: 'medium',
     azure_bridge: {
       openai_way: 'Custom logging and monitoring',
       azure_equivalent: 'Azure Monitor, Application Insights integration',
@@ -1918,6 +2000,7 @@ const QUESTION_BANK: QuestionBankItem[] = [
     topic: 'production',
     subtopic: 'caching',
     difficulty: 'advanced',
+    bank: 'hard',
     azure_bridge: {
       openai_way: 'Automatic prompt caching for repeated prefixes',
       azure_equivalent: 'Azure OpenAI supports prompt caching',
@@ -1938,6 +2021,7 @@ const QUESTION_BANK: QuestionBankItem[] = [
     topic: 'safety',
     subtopic: 'moderation',
     difficulty: 'intermediate',
+    bank: 'medium',
     azure_bridge: {
       openai_way: 'Moderation API with category scores',
       azure_equivalent: 'Azure Content Safety API with similar categories',
@@ -1957,6 +2041,7 @@ const QUESTION_BANK: QuestionBankItem[] = [
     topic: 'safety',
     subtopic: 'content-filtering',
     difficulty: 'intermediate',
+    bank: 'medium',
     azure_bridge: {
       openai_way: 'Moderation API for both input and output',
       azure_equivalent: 'Automatic input and output filtering in Azure OpenAI',
@@ -1976,6 +2061,7 @@ const QUESTION_BANK: QuestionBankItem[] = [
     topic: 'safety',
     subtopic: 'responsible-ai',
     difficulty: 'advanced',
+    bank: 'hard',
     azure_bridge: {
       openai_way: 'Custom implementation of safety layers',
       azure_equivalent: 'Azure Responsible AI tools and content filtering',
@@ -1995,6 +2081,7 @@ const QUESTION_BANK: QuestionBankItem[] = [
     topic: 'safety',
     subtopic: 'prompt-injection',
     difficulty: 'advanced',
+    bank: 'hard',
     azure_bridge: {
       openai_way: 'Custom detection logic',
       azure_equivalent: 'Azure Content Safety jailbreak detection',
@@ -2020,6 +2107,7 @@ const QUESTION_BANK: QuestionBankItem[] = [
     topic: 'api-basics',
     subtopic: 'mission',
     difficulty: 'beginner',
+    bank: 'easy',
     azure_bridge: {
       openai_way: 'Mission: Safe AGI for all of humanity',
       azure_equivalent: 'Azure AI focuses on responsible AI and enterprise safety',
@@ -2044,6 +2132,7 @@ const QUESTION_BANK: QuestionBankItem[] = [
     topic: 'api-basics',
     subtopic: 'mission',
     difficulty: 'beginner',
+    bank: 'easy',
     azure_bridge: {
       openai_way: 'Not credential-driven, values potential and contribution',
       azure_equivalent: 'Microsoft values growth mindset and diverse backgrounds',
@@ -2068,6 +2157,7 @@ const QUESTION_BANK: QuestionBankItem[] = [
     topic: 'api-basics',
     subtopic: 'mission',
     difficulty: 'beginner',
+    bank: 'easy',
     azure_bridge: {
       openai_way: 'High potential = quick ramp-up + results',
       azure_equivalent: 'Growth mindset and learning agility',
@@ -2092,6 +2182,7 @@ const QUESTION_BANK: QuestionBankItem[] = [
     topic: 'api-basics',
     subtopic: 'mission',
     difficulty: 'beginner',
+    bank: 'easy',
     azure_bridge: {
       openai_way: '4-6 hours, 4-6 interviewers, 1-2 days',
       azure_equivalent: 'Microsoft has similar multi-round interview loops',
@@ -2116,6 +2207,7 @@ const QUESTION_BANK: QuestionBankItem[] = [
     topic: 'api-basics',
     subtopic: 'best-practices',
     difficulty: 'intermediate',
+    bank: 'medium',
     azure_bridge: {
       openai_way: 'Design + quality + performance + tests',
       azure_equivalent: 'Similar engineering excellence standards',
@@ -2140,6 +2232,7 @@ const QUESTION_BANK: QuestionBankItem[] = [
     topic: 'api-basics',
     subtopic: 'mission',
     difficulty: 'beginner',
+    bank: 'easy',
     azure_bridge: {
       openai_way: 'OpenAI Charter defines mission and safety principles',
       azure_equivalent: 'Microsoft Responsible AI principles',
@@ -2164,6 +2257,7 @@ const QUESTION_BANK: QuestionBankItem[] = [
     topic: 'api-basics',
     subtopic: 'best-practices',
     difficulty: 'intermediate',
+    bank: 'medium',
     azure_bridge: {
       openai_way: 'Deep Learning Book + Spinning Up + research papers',
       azure_equivalent: 'Azure AI documentation + Microsoft Learn',
@@ -2188,6 +2282,7 @@ const QUESTION_BANK: QuestionBankItem[] = [
     topic: 'api-basics',
     subtopic: 'best-practices',
     difficulty: 'intermediate',
+    bank: 'medium',
     azure_bridge: {
       openai_way: 'Practical problems: caching, iterators, time-series',
       azure_equivalent: 'Similar practical coding challenges',
@@ -2212,6 +2307,7 @@ const QUESTION_BANK: QuestionBankItem[] = [
     topic: 'production',
     subtopic: 'architecture',
     difficulty: 'advanced',
+    bank: 'hard',
     azure_bridge: {
       openai_way: 'Design feeds, notifications, ML serving',
       azure_equivalent: 'Azure architecture patterns for similar systems',
@@ -2236,6 +2332,7 @@ const QUESTION_BANK: QuestionBankItem[] = [
     topic: 'api-basics',
     subtopic: 'mission',
     difficulty: 'beginner',
+    bank: 'easy',
     azure_bridge: {
       openai_way: 'Collaboration + communication + feedback + mission',
       azure_equivalent: 'Microsoft values similar collaborative qualities',
@@ -2260,6 +2357,7 @@ const QUESTION_BANK: QuestionBankItem[] = [
     topic: 'chat-completions',
     subtopic: 'models',
     difficulty: 'beginner',
+    bank: 'easy',
     azure_bridge: {
       openai_way: 'Autoregressive next-token prediction',
       azure_equivalent: 'Same underlying mechanism',
@@ -2284,6 +2382,7 @@ const QUESTION_BANK: QuestionBankItem[] = [
     topic: 'chat-completions',
     subtopic: 'models',
     difficulty: 'intermediate',
+    bank: 'medium',
     azure_bridge: {
       openai_way: 'Transformer architecture with self-attention',
       azure_equivalent: 'Same architecture in Azure OpenAI models',
@@ -2308,6 +2407,7 @@ const QUESTION_BANK: QuestionBankItem[] = [
     topic: 'chat-completions',
     subtopic: 'parameters',
     difficulty: 'beginner',
+    bank: 'easy',
     azure_bridge: {
       openai_way: 'Context window varies by model (4K to 128K+)',
       azure_equivalent: 'Same context windows in Azure OpenAI',
@@ -2332,6 +2432,7 @@ const QUESTION_BANK: QuestionBankItem[] = [
     topic: 'chat-completions',
     subtopic: 'parameters',
     difficulty: 'intermediate',
+    bank: 'medium',
     azure_bridge: {
       openai_way: 'tiktoken library for tokenization',
       azure_equivalent: 'Same tokenization in Azure OpenAI',
@@ -2356,6 +2457,7 @@ const QUESTION_BANK: QuestionBankItem[] = [
     topic: 'function-calling',
     subtopic: 'tools',
     difficulty: 'intermediate',
+    bank: 'medium',
     azure_bridge: {
       openai_way: 'Agents API for autonomous task execution',
       azure_equivalent: 'Azure AI Agent Service (preview)',
@@ -2380,6 +2482,7 @@ const QUESTION_BANK: QuestionBankItem[] = [
     topic: 'function-calling',
     subtopic: 'tools',
     difficulty: 'advanced',
+    bank: 'hard',
     azure_bridge: {
       openai_way: 'ReAct pattern with function calling',
       azure_equivalent: 'Same pattern in Azure OpenAI',
@@ -3747,8 +3850,13 @@ export default function App() {
       })
     })
 
+    // Get available banks based on user progress (5 banks: easy, medium, hard, code_review, advanced)
+    const availableBanks = getBankForProgress(userProgress)
+
     // Use local question bank for instant loading - no API call needed
     let availableQuestions = QUESTION_BANK.filter(q => {
+      // Must be from an available bank based on progress
+      if (!availableBanks.includes(q.bank)) return false
       if (topic && q.topic !== topic) return false
       if (subtopic && q.subtopic !== subtopic) return false
       // PREVENT REPETITION: Exclude already-used questions in this session
