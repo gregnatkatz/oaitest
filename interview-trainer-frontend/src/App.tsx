@@ -7,7 +7,8 @@ import { Progress } from '@/components/ui/progress'
 import { 
   Play, Mic, MicOff, Target, Trophy, ChevronRight, CheckCircle, 
   Zap, Code, BookOpen, Sparkles, ArrowRight, RotateCcw, Timer, Lightbulb, 
-  MessageSquare, RefreshCw, Home
+  MessageSquare, RefreshCw, Home, Layers, Brain, Shield, Database, Settings,
+  Wrench, Lock, ChevronDown, ChevronUp, Star
 } from 'lucide-react'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
@@ -34,6 +35,128 @@ interface SessionStats {
   bestStreak: number
 }
 
+interface Topic {
+  id: string
+  name: string
+  icon: React.ElementType
+  color: string
+  description: string
+  subtopics: { id: string; name: string; mastery: number }[]
+}
+
+interface TopicMastery {
+  [topicId: string]: {
+    [subtopicId: string]: { correct: number; total: number; lastPracticed: string }
+  }
+}
+
+const TOPICS: Topic[] = [
+  {
+    id: 'api-basics',
+    name: 'API Basics',
+    icon: Settings,
+    color: 'text-blue-400',
+    description: 'Authentication, endpoints, rate limits',
+    subtopics: [
+      { id: 'authentication', name: 'Authentication & API Keys', mastery: 0 },
+      { id: 'endpoints', name: 'Endpoint Structure', mastery: 0 },
+      { id: 'rate-limits', name: 'Rate Limits & Quotas', mastery: 0 },
+      { id: 'error-handling', name: 'Error Handling', mastery: 0 }
+    ]
+  },
+  {
+    id: 'chat-completions',
+    name: 'Chat Completions',
+    icon: MessageSquare,
+    color: 'text-emerald-400',
+    description: 'Messages, roles, streaming, parameters',
+    subtopics: [
+      { id: 'messages', name: 'Message Structure & Roles', mastery: 0 },
+      { id: 'parameters', name: 'Temperature & Top-P', mastery: 0 },
+      { id: 'streaming', name: 'Streaming Responses', mastery: 0 },
+      { id: 'tokens', name: 'Token Management', mastery: 0 }
+    ]
+  },
+  {
+    id: 'function-calling',
+    name: 'Function Calling',
+    icon: Wrench,
+    color: 'text-purple-400',
+    description: 'Tools, schemas, parallel calls',
+    subtopics: [
+      { id: 'tool-definition', name: 'Tool Definitions', mastery: 0 },
+      { id: 'json-schema', name: 'JSON Schema', mastery: 0 },
+      { id: 'parallel-calls', name: 'Parallel Tool Calls', mastery: 0 },
+      { id: 'structured-output', name: 'Structured Outputs', mastery: 0 }
+    ]
+  },
+  {
+    id: 'assistants-api',
+    name: 'Assistants API',
+    icon: Brain,
+    color: 'text-pink-400',
+    description: 'Threads, runs, file handling',
+    subtopics: [
+      { id: 'assistants', name: 'Creating Assistants', mastery: 0 },
+      { id: 'threads', name: 'Threads & Messages', mastery: 0 },
+      { id: 'runs', name: 'Runs & Polling', mastery: 0 },
+      { id: 'files', name: 'File Handling', mastery: 0 }
+    ]
+  },
+  {
+    id: 'embeddings-rag',
+    name: 'Embeddings & RAG',
+    icon: Database,
+    color: 'text-cyan-400',
+    description: 'Vector search, chunking, retrieval',
+    subtopics: [
+      { id: 'embeddings', name: 'Creating Embeddings', mastery: 0 },
+      { id: 'vector-search', name: 'Vector Search', mastery: 0 },
+      { id: 'chunking', name: 'Document Chunking', mastery: 0 },
+      { id: 'retrieval', name: 'Retrieval Strategies', mastery: 0 }
+    ]
+  },
+  {
+    id: 'fine-tuning',
+    name: 'Fine-Tuning',
+    icon: Layers,
+    color: 'text-amber-400',
+    description: 'Training data, jobs, evaluation',
+    subtopics: [
+      { id: 'data-prep', name: 'Data Preparation', mastery: 0 },
+      { id: 'training-jobs', name: 'Training Jobs', mastery: 0 },
+      { id: 'hyperparameters', name: 'Hyperparameters', mastery: 0 },
+      { id: 'evaluation', name: 'Model Evaluation', mastery: 0 }
+    ]
+  },
+  {
+    id: 'production',
+    name: 'Production Patterns',
+    icon: Zap,
+    color: 'text-orange-400',
+    description: 'Caching, fallbacks, monitoring',
+    subtopics: [
+      { id: 'caching', name: 'Response Caching', mastery: 0 },
+      { id: 'fallbacks', name: 'Fallback Strategies', mastery: 0 },
+      { id: 'monitoring', name: 'Monitoring & Logging', mastery: 0 },
+      { id: 'cost-optimization', name: 'Cost Optimization', mastery: 0 }
+    ]
+  },
+  {
+    id: 'safety',
+    name: 'Safety & Moderation',
+    icon: Shield,
+    color: 'text-red-400',
+    description: 'Content filtering, guardrails',
+    subtopics: [
+      { id: 'moderation', name: 'Moderation API', mastery: 0 },
+      { id: 'content-filtering', name: 'Content Filtering', mastery: 0 },
+      { id: 'prompt-injection', name: 'Prompt Injection Defense', mastery: 0 },
+      { id: 'responsible-ai', name: 'Responsible AI', mastery: 0 }
+    ]
+  }
+]
+
 const ScoreCircle = ({ score, size = 120 }: { score: number; size?: number }) => {
   const circumference = 2 * Math.PI * 45
   const strokeDashoffset = circumference - (score / 100) * circumference
@@ -59,11 +182,191 @@ const ScoreCircle = ({ score, size = 120 }: { score: number; size?: number }) =>
   )
 }
 
+const getMasteryLevel = (mastery: number): { label: string; color: string; stars: number } => {
+  if (mastery >= 90) return { label: 'Master', color: 'text-amber-400', stars: 5 }
+  if (mastery >= 75) return { label: 'Expert', color: 'text-purple-400', stars: 4 }
+  if (mastery >= 60) return { label: 'Proficient', color: 'text-emerald-400', stars: 3 }
+  if (mastery >= 40) return { label: 'Learning', color: 'text-blue-400', stars: 2 }
+  if (mastery >= 20) return { label: 'Beginner', color: 'text-zinc-400', stars: 1 }
+  return { label: 'New', color: 'text-zinc-500', stars: 0 }
+}
+
+const TopicPickerScreen = ({
+  onSelectTopic,
+  onBack,
+  topicMastery
+}: {
+  onSelectTopic: (topicId: string, subtopicId?: string) => void
+  onBack: () => void
+  topicMastery: TopicMastery
+}) => {
+  const [expandedTopic, setExpandedTopic] = useState<string | null>(null)
+  const [filterLevel, setFilterLevel] = useState<'all' | 'weak' | 'strong'>('all')
+
+  const getTopicMasteryScore = (topicId: string): number => {
+    const topicData = topicMastery[topicId]
+    if (!topicData) return 0
+    const subtopics = Object.values(topicData)
+    if (subtopics.length === 0) return 0
+    const totalScore = subtopics.reduce((acc, s) => {
+      if (s.total === 0) return acc
+      return acc + (s.correct / s.total) * 100
+    }, 0)
+    const practiced = subtopics.filter(s => s.total > 0).length
+    return practiced > 0 ? Math.round(totalScore / practiced) : 0
+  }
+
+  const getSubtopicMastery = (topicId: string, subtopicId: string): number => {
+    const data = topicMastery[topicId]?.[subtopicId]
+    if (!data || data.total === 0) return 0
+    return Math.round((data.correct / data.total) * 100)
+  }
+
+  const filteredTopics = TOPICS.filter(topic => {
+    const mastery = getTopicMasteryScore(topic.id)
+    if (filterLevel === 'weak') return mastery < 60
+    if (filterLevel === 'strong') return mastery >= 60
+    return true
+  })
+
+  return (
+    <div className="min-h-screen bg-zinc-950 text-white p-8">
+      <div className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-4xl h-96 bg-gradient-to-b from-orange-500/20 via-amber-500/10 to-transparent blur-3xl pointer-events-none" />
+      
+      <div className="max-w-4xl mx-auto relative">
+        <div className="flex items-center justify-between mb-8">
+          <Button variant="ghost" onClick={onBack} className="text-zinc-400 hover:text-white">
+            <ChevronRight className="w-4 h-4 mr-1 rotate-180" /> Back
+          </Button>
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-orange-500/10 border border-orange-500/20">
+            <Sparkles className="w-4 h-4 text-orange-400" />
+            <span className="text-sm text-orange-300">Topic Browser</span>
+          </div>
+        </div>
+
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-bold mb-2 bg-gradient-to-r from-white via-zinc-200 to-zinc-400 bg-clip-text text-transparent">
+            Choose Your Focus
+          </h1>
+          <p className="text-zinc-400">Select a topic area to practice</p>
+        </div>
+
+        <div className="flex items-center justify-center gap-2 mb-8">
+          {[
+            { id: 'all', label: 'All Topics' },
+            { id: 'weak', label: 'Needs Work' },
+            { id: 'strong', label: 'Strong Areas' }
+          ].map((filter) => (
+            <button
+              key={filter.id}
+              onClick={() => setFilterLevel(filter.id as 'all' | 'weak' | 'strong')}
+              className={`px-4 py-2 rounded-lg text-sm transition-all ${
+                filterLevel === filter.id
+                  ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
+                  : 'bg-zinc-900 text-zinc-400 border border-zinc-800 hover:border-zinc-700'
+              }`}
+            >
+              {filter.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="grid gap-4">
+          {filteredTopics.map((topic) => {
+            const mastery = getTopicMasteryScore(topic.id)
+            const masteryInfo = getMasteryLevel(mastery)
+            const isExpanded = expandedTopic === topic.id
+            
+            return (
+              <Card key={topic.id} className="bg-zinc-900 border-zinc-800 overflow-hidden">
+                <button
+                  onClick={() => setExpandedTopic(isExpanded ? null : topic.id)}
+                  className="w-full p-4 flex items-center gap-4 text-left hover:bg-zinc-800/50 transition-colors"
+                >
+                  <div className={`w-12 h-12 rounded-xl bg-zinc-800 flex items-center justify-center ${topic.color}`}>
+                    <topic.icon className="w-6 h-6" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="font-semibold text-white">{topic.name}</h3>
+                      <Badge className={`${masteryInfo.color} bg-transparent border-current`}>
+                        {masteryInfo.label}
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-zinc-500">{topic.description}</p>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div className="text-right">
+                      <div className="flex items-center gap-1 justify-end mb-1">
+                        {[...Array(5)].map((_, i) => (
+                          <Star
+                            key={i}
+                            className={`w-3 h-3 ${i < masteryInfo.stars ? 'text-amber-400 fill-amber-400' : 'text-zinc-700'}`}
+                          />
+                        ))}
+                      </div>
+                      <span className="text-sm text-zinc-500">{mastery}% mastery</span>
+                    </div>
+                    {isExpanded ? (
+                      <ChevronUp className="w-5 h-5 text-zinc-500" />
+                    ) : (
+                      <ChevronDown className="w-5 h-5 text-zinc-500" />
+                    )}
+                  </div>
+                </button>
+                
+                {isExpanded && (
+                  <div className="border-t border-zinc-800 p-4 bg-zinc-900/50">
+                    <div className="grid grid-cols-2 gap-3">
+                      {topic.subtopics.map((subtopic) => {
+                        const subMastery = getSubtopicMastery(topic.id, subtopic.id)
+                        const subMasteryInfo = getMasteryLevel(subMastery)
+                        
+                        return (
+                          <button
+                            key={subtopic.id}
+                            onClick={() => onSelectTopic(topic.id, subtopic.id)}
+                            className="p-3 rounded-lg bg-zinc-800 border border-zinc-700 hover:border-orange-500/50 transition-all text-left group"
+                          >
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-sm font-medium text-zinc-200 group-hover:text-orange-400 transition-colors">
+                                {subtopic.name}
+                              </span>
+                              <Lock className={`w-3 h-3 ${subMastery === 0 ? 'text-zinc-600' : 'text-transparent'}`} />
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Progress value={subMastery} className="h-1.5 flex-1" />
+                              <span className={`text-xs ${subMasteryInfo.color}`}>{subMastery}%</span>
+                            </div>
+                          </button>
+                        )
+                      })}
+                    </div>
+                    <Button
+                      onClick={() => onSelectTopic(topic.id)}
+                      className="w-full mt-4 bg-gradient-to-r from-orange-500 to-amber-500 text-white"
+                    >
+                      Practice All {topic.name}
+                      <ArrowRight className="w-4 h-4 ml-2" />
+                    </Button>
+                  </div>
+                )}
+              </Card>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 const SessionStartScreen = ({ 
   onStartSession, 
+  onBrowseTopics,
   weakAreas 
 }: { 
   onStartSession: (duration: number, type: string, category: string) => void
+  onBrowseTopics: () => void
   weakAreas: { category: string; avgScore: number }[]
 }) => {
   const [selectedDuration, setSelectedDuration] = useState(20)
@@ -172,19 +475,29 @@ const SessionStartScreen = ({
           </div>
         </div>
 
-        <Button 
-          onClick={() => onStartSession(selectedDuration, selectedType, '')}
-          className="w-full h-14 text-lg bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600 text-white shadow-lg shadow-orange-500/25 hover:shadow-orange-500/40"
-        >
-          <Play className="w-5 h-5 mr-2" />
-          Start {selectedType.charAt(0).toUpperCase() + selectedType.slice(1)} Session
-        </Button>
+        <div className="flex gap-4">
+          <Button 
+            variant="outline"
+            onClick={onBrowseTopics}
+            className="flex-1 h-14 text-lg border-zinc-700 hover:border-orange-500/50 hover:bg-orange-500/10"
+          >
+            <Layers className="w-5 h-5 mr-2" />
+            Browse Topics
+          </Button>
+          <Button 
+            onClick={() => onStartSession(selectedDuration, selectedType, '')}
+            className="flex-1 h-14 text-lg bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600 text-white shadow-lg shadow-orange-500/25 hover:shadow-orange-500/40"
+          >
+            <Play className="w-5 h-5 mr-2" />
+            Start Session
+          </Button>
+        </div>
       </div>
     </div>
   )
 }
 
-const QuestionScreen = ({ 
+const QuestionScreen = ({
   question, questionIndex, totalQuestions, timeLeft, sessionStats,
   onSubmitAnswer, onNextQuestion, feedback, isLoading, onEndSession
 }: { 
@@ -483,7 +796,7 @@ const SessionSummaryScreen = ({
 }
 
 export default function App() {
-  const [screen, setScreen] = useState<'start' | 'question' | 'summary'>('start')
+  const [screen, setScreen] = useState<'start' | 'topics' | 'question' | 'summary'>('start')
   const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null)
   const [feedback, setFeedback] = useState<Feedback | null>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -495,8 +808,20 @@ export default function App() {
   const [avgScore, setAvgScore] = useState(0)
   const [totalScore, setTotalScore] = useState(0)
   const [weakAreas, setWeakAreas] = useState<{ category: string; avgScore: number }[]>([])
+  const [topicMastery, setTopicMastery] = useState<TopicMastery>({})
+  const [currentTopic, setCurrentTopic] = useState<string>('')
+  const [currentSubtopic, setCurrentSubtopic] = useState<string>('')
 
   useEffect(() => {
+    const savedMastery = localStorage.getItem('topicMastery')
+    if (savedMastery) {
+      try {
+        setTopicMastery(JSON.parse(savedMastery))
+      } catch (e) {
+        console.error('Failed to parse topic mastery:', e)
+      }
+    }
+
     const saved = localStorage.getItem('interviewProgress')
     if (saved) {
       try {
@@ -546,17 +871,22 @@ export default function App() {
     await generateQuestion(type)
   }
 
-  const generateQuestion = async (type?: string) => {
+  const generateQuestion = async (type?: string, topicId?: string, subtopicId?: string) => {
     setIsLoading(true)
     setFeedback(null)
     setCurrentQuestion(null)
+
+    const topic = topicId || currentTopic
+    const subtopic = subtopicId || currentSubtopic
+    const topicName = TOPICS.find(t => t.id === topic)?.name || ''
+    const subtopicName = TOPICS.find(t => t.id === topic)?.subtopics.find(s => s.id === subtopic)?.name || ''
 
     try {
       const response = await fetch(`${API_URL}/api/question`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          category: '',
+          category: subtopicName || topicName || '',
           difficulty: 'medium',
           interview_type: type || sessionType
         })
@@ -602,6 +932,10 @@ export default function App() {
       const newTotalScore = totalScore + data.score
       setTotalScore(newTotalScore)
       setAvgScore(Math.round(newTotalScore / (sessionStats.total + 1)))
+      
+      if (currentTopic && currentSubtopic) {
+        updateTopicMastery(currentTopic, currentSubtopic, isCorrect)
+      }
     } catch (error) {
       console.error('Failed to evaluate answer:', error)
     } finally {
@@ -621,12 +955,51 @@ export default function App() {
     setScreen('summary')
   }
 
+  const handleSelectTopic = (topicId: string, subtopicId?: string) => {
+    setCurrentTopic(topicId)
+    setCurrentSubtopic(subtopicId || '')
+    setTotalQuestions(20)
+    setSessionType('technical')
+    setQuestionIndex(0)
+    setSessionStats({ correct: 0, total: 0, streak: 0, bestStreak: 0 })
+    setTotalScore(0)
+    setAvgScore(0)
+    setTimeLeft(20 * 90)
+    setScreen('question')
+    generateQuestion('technical', topicId, subtopicId)
+  }
+
+  const updateTopicMastery = (topicId: string, subtopicId: string, isCorrect: boolean) => {
+    setTopicMastery(prev => {
+      const updated = { ...prev }
+      if (!updated[topicId]) updated[topicId] = {}
+      if (!updated[topicId][subtopicId]) {
+        updated[topicId][subtopicId] = { correct: 0, total: 0, lastPracticed: '' }
+      }
+      updated[topicId][subtopicId] = {
+        correct: updated[topicId][subtopicId].correct + (isCorrect ? 1 : 0),
+        total: updated[topicId][subtopicId].total + 1,
+        lastPracticed: new Date().toISOString()
+      }
+      localStorage.setItem('topicMastery', JSON.stringify(updated))
+      return updated
+    })
+  }
+
   return (
     <div className="font-sans">
       {screen === 'start' && (
         <SessionStartScreen 
           onStartSession={startSession}
+          onBrowseTopics={() => setScreen('topics')}
           weakAreas={weakAreas}
+        />
+      )}
+      {screen === 'topics' && (
+        <TopicPickerScreen
+          onSelectTopic={handleSelectTopic}
+          onBack={() => setScreen('start')}
+          topicMastery={topicMastery}
         />
       )}
       {screen === 'question' && (
