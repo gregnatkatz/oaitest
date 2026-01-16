@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -2489,10 +2489,388 @@ const QUESTION_BANK: QuestionBankItem[] = [
       key_differences: 'No differences in pattern implementation.',
       interview_phrase: 'ReAct enables agents to reason about tasks, take actions via tools, and observe results in an iterative loop.'
     }
+  },
+  // CODE REVIEW BANK - Real code snippets with bugs to identify
+  {
+    id: 'code-review-1',
+    question: 'What is wrong with this OpenAI API code?',
+    hints: ['Check the parameter name', 'Deprecated in newer versions'],
+    expected_topics: ['max_tokens', 'max_completion_tokens', 'deprecation'],
+    code_snippet: `response = client.chat.completions.create(
+    model="gpt-4o",
+    messages=[{"role": "user", "content": "Hello"}],
+    max_tokens=100
+)`,
+    options: [
+      'The model name is incorrect',
+      'max_tokens is deprecated for newer models - should use max_completion_tokens',
+      'The messages array is malformed',
+      'Missing temperature parameter'
+    ],
+    correct_option: 1,
+    blank_answer: 'max_completion_tokens',
+    topic: 'chat-completions',
+    subtopic: 'parameters',
+    difficulty: 'intermediate',
+    bank: 'code_review',
+    azure_bridge: {
+      openai_way: 'max_completion_tokens for newer models',
+      azure_equivalent: 'Same parameter change in Azure OpenAI',
+      key_differences: 'Both platforms deprecated max_tokens for newer model versions.',
+      interview_phrase: 'I always use max_completion_tokens for GPT-4o and newer models to ensure forward compatibility.'
+    }
+  },
+  {
+    id: 'code-review-2',
+    question: 'What security issue exists in this code?',
+    hints: ['API key handling', 'Never hardcode secrets'],
+    expected_topics: ['security', 'API keys', 'environment variables'],
+    code_snippet: `from openai import OpenAI
+
+client = OpenAI(api_key="sk-proj-abc123xyz789")
+
+response = client.chat.completions.create(
+    model="gpt-4o",
+    messages=[{"role": "user", "content": "Hello"}]
+)`,
+    options: [
+      'The model parameter is wrong',
+      'API key is hardcoded - should use environment variable or secret manager',
+      'Missing error handling',
+      'The import statement is incorrect'
+    ],
+    correct_option: 1,
+    blank_answer: 'hardcoded API key',
+    topic: 'api-basics',
+    subtopic: 'authentication',
+    difficulty: 'beginner',
+    bank: 'code_review',
+    azure_bridge: {
+      openai_way: 'Use OPENAI_API_KEY environment variable',
+      azure_equivalent: 'Use Azure Key Vault or Managed Identity',
+      key_differences: 'Azure provides additional security options like Managed Identity.',
+      interview_phrase: 'Never hardcode API keys - use environment variables or a secret manager like Azure Key Vault.'
+    }
+  },
+  {
+    id: 'code-review-3',
+    question: 'What bug exists in this streaming implementation?',
+    hints: ['Check the delta content', 'None values'],
+    expected_topics: ['streaming', 'delta', 'None handling'],
+    code_snippet: `stream = client.chat.completions.create(
+    model="gpt-4o",
+    messages=[{"role": "user", "content": "Hello"}],
+    stream=True
+)
+
+for chunk in stream:
+    print(chunk.choices[0].delta.content)`,
+    options: [
+      'The stream parameter should be a string',
+      'delta.content can be None - need to handle with: print(chunk.choices[0].delta.content or "", end="")',
+      'Missing the model parameter',
+      'The for loop syntax is wrong'
+    ],
+    correct_option: 1,
+    blank_answer: 'handle None delta content',
+    topic: 'chat-completions',
+    subtopic: 'streaming',
+    difficulty: 'intermediate',
+    bank: 'code_review',
+    azure_bridge: {
+      openai_way: 'Handle None in delta.content',
+      azure_equivalent: 'Same streaming behavior in Azure OpenAI',
+      key_differences: 'Streaming works identically in both platforms.',
+      interview_phrase: 'Always handle None values in streaming responses - the first and last chunks often have None content.'
+    }
+  },
+  {
+    id: 'code-review-4',
+    question: 'What is inefficient about this RAG implementation?',
+    hints: ['Embedding calls', 'Batching'],
+    expected_topics: ['embeddings', 'batching', 'efficiency'],
+    code_snippet: `documents = ["doc1", "doc2", "doc3", "doc4", "doc5"]
+embeddings = []
+
+for doc in documents:
+    response = client.embeddings.create(
+        model="text-embedding-3-small",
+        input=doc
+    )
+    embeddings.append(response.data[0].embedding)`,
+    options: [
+      'The model name is wrong',
+      'Making separate API calls for each document - should batch all inputs in a single call',
+      'The embedding response format is incorrect',
+      'Missing the dimensions parameter'
+    ],
+    correct_option: 1,
+    blank_answer: 'batch embedding calls',
+    topic: 'embeddings-rag',
+    subtopic: 'embeddings',
+    difficulty: 'intermediate',
+    bank: 'code_review',
+    azure_bridge: {
+      openai_way: 'Batch up to 2048 inputs per call',
+      azure_equivalent: 'Same batching limits in Azure OpenAI',
+      key_differences: 'Both platforms support batching for efficiency.',
+      interview_phrase: 'Always batch embedding requests - you can send up to 2048 inputs in a single API call.'
+    }
+  },
+  {
+    id: 'code-review-5',
+    question: 'What is wrong with this function calling implementation?',
+    hints: ['JSON parsing', 'Error handling'],
+    expected_topics: ['function calling', 'JSON', 'tool_calls'],
+    code_snippet: `response = client.chat.completions.create(
+    model="gpt-4o",
+    messages=[{"role": "user", "content": "What's the weather?"}],
+    tools=[{"type": "function", "function": weather_function}]
+)
+
+# Execute the function
+args = response.choices[0].message.tool_calls[0].function.arguments
+result = get_weather(args["location"])`,
+    options: [
+      'The tools parameter format is wrong',
+      'arguments is a JSON string that needs to be parsed with json.loads() before accessing keys',
+      'The function definition is missing',
+      'Missing the tool_choice parameter'
+    ],
+    correct_option: 1,
+    blank_answer: 'parse JSON arguments',
+    topic: 'function-calling',
+    subtopic: 'tools',
+    difficulty: 'intermediate',
+    bank: 'code_review',
+    azure_bridge: {
+      openai_way: 'json.loads(tool_calls[0].function.arguments)',
+      azure_equivalent: 'Same JSON parsing required in Azure',
+      key_differences: 'Function calling works identically in both platforms.',
+      interview_phrase: 'Always parse function arguments with json.loads() - they come as a JSON string, not a dict.'
+    }
+  },
+  {
+    id: 'code-review-6',
+    question: 'What is missing from this retry implementation?',
+    hints: ['Rate limiting', 'Exponential backoff'],
+    expected_topics: ['retry', 'rate limiting', 'backoff'],
+    code_snippet: `import time
+
+def call_api_with_retry(messages, max_retries=3):
+    for attempt in range(max_retries):
+        try:
+            return client.chat.completions.create(
+                model="gpt-4o",
+                messages=messages
+            )
+        except Exception as e:
+            time.sleep(1)
+    raise Exception("Max retries exceeded")`,
+    options: [
+      'The model parameter is wrong',
+      'Missing exponential backoff - should use time.sleep(2 ** attempt) and only retry on rate limit errors',
+      'The exception handling is correct',
+      'Missing the temperature parameter'
+    ],
+    correct_option: 1,
+    blank_answer: 'exponential backoff',
+    topic: 'api-basics',
+    subtopic: 'rate-limits',
+    difficulty: 'intermediate',
+    bank: 'code_review',
+    azure_bridge: {
+      openai_way: 'Exponential backoff with jitter',
+      azure_equivalent: 'Azure SDK has built-in retry policies',
+      key_differences: 'Azure SDK provides automatic retry with exponential backoff.',
+      interview_phrase: 'Use exponential backoff with jitter for retries - or use the tenacity library for robust retry logic.'
+    }
+  },
+  {
+    id: 'code-review-7',
+    question: 'What issue exists in this token counting code?',
+    hints: ['Model-specific encoding', 'tiktoken'],
+    expected_topics: ['tokens', 'tiktoken', 'encoding'],
+    code_snippet: `def count_tokens(text):
+    # Count tokens for GPT-4o
+    return len(text.split())`,
+    options: [
+      'The function name is wrong',
+      'Word count is not token count - should use tiktoken with the correct encoding for the model',
+      'The return statement is correct',
+      'Missing the model parameter'
+    ],
+    correct_option: 1,
+    blank_answer: 'use tiktoken',
+    topic: 'chat-completions',
+    subtopic: 'parameters',
+    difficulty: 'intermediate',
+    bank: 'code_review',
+    azure_bridge: {
+      openai_way: 'tiktoken.encoding_for_model("gpt-4o")',
+      azure_equivalent: 'Same tiktoken library works for Azure OpenAI',
+      key_differences: 'Token counting is identical across platforms.',
+      interview_phrase: 'Always use tiktoken for accurate token counting - word count can be off by 30% or more.'
+    }
+  },
+  {
+    id: 'code-review-8',
+    question: 'What is the issue with this structured output code?',
+    hints: ['Response format', 'JSON schema'],
+    expected_topics: ['structured output', 'JSON', 'response_format'],
+    code_snippet: `response = client.chat.completions.create(
+    model="gpt-4o",
+    messages=[{"role": "user", "content": "List 3 colors"}],
+    response_format={"type": "json"}
+)`,
+    options: [
+      'The model does not support JSON mode',
+      'response_format should be {"type": "json_object"} not {"type": "json"}',
+      'Missing the temperature parameter',
+      'The messages format is wrong'
+    ],
+    correct_option: 1,
+    blank_answer: 'json_object not json',
+    topic: 'chat-completions',
+    subtopic: 'parameters',
+    difficulty: 'intermediate',
+    bank: 'code_review',
+    azure_bridge: {
+      openai_way: 'response_format={"type": "json_object"}',
+      azure_equivalent: 'Same response_format in Azure OpenAI',
+      key_differences: 'JSON mode works identically in both platforms.',
+      interview_phrase: 'Use json_object for JSON mode - and always instruct the model to output JSON in the prompt too.'
+    }
+  },
+  // ADVANCED BANK - System design and architecture questions
+  {
+    id: 'advanced-1',
+    question: 'How would you design a production RAG system that handles 10,000 queries per minute?',
+    hints: ['Caching', 'Vector database', 'Load balancing'],
+    expected_topics: ['RAG', 'scaling', 'caching', 'vector database'],
+    code_snippet: null,
+    options: [
+      'Just use a bigger model',
+      'Implement semantic caching, use a distributed vector database (Pinecone/Weaviate), add query result caching, use async processing, and implement load balancing across multiple API endpoints',
+      'Store everything in a SQL database',
+      'Use a single API endpoint with no caching'
+    ],
+    correct_option: 1,
+    blank_answer: 'semantic caching, distributed vector DB, async processing',
+    topic: 'embeddings-rag',
+    subtopic: 'vector-search',
+    difficulty: 'advanced',
+    bank: 'advanced',
+    azure_bridge: {
+      openai_way: 'OpenAI + Pinecone/Weaviate',
+      azure_equivalent: 'Azure OpenAI + Azure AI Search with semantic ranking',
+      key_differences: 'Azure AI Search provides integrated vector + keyword hybrid search.',
+      interview_phrase: 'For production RAG, I use semantic caching to reduce API calls by 40-60% and Azure AI Search for hybrid retrieval.'
+    }
+  },
+  {
+    id: 'advanced-2',
+    question: 'How do you handle hallucinations in a production LLM application?',
+    hints: ['Grounding', 'Verification', 'Confidence scores'],
+    expected_topics: ['hallucination', 'grounding', 'verification'],
+    code_snippet: null,
+    options: [
+      'Hallucinations cannot be prevented',
+      'Use RAG for grounding, implement fact verification, add confidence scoring, use structured outputs, and include human-in-the-loop for critical decisions',
+      'Just use a higher temperature',
+      'Only use the largest model available'
+    ],
+    correct_option: 1,
+    blank_answer: 'RAG grounding, fact verification, confidence scoring',
+    topic: 'chat-completions',
+    subtopic: 'messages',
+    difficulty: 'advanced',
+    bank: 'advanced',
+    azure_bridge: {
+      openai_way: 'RAG + verification + structured outputs',
+      azure_equivalent: 'Azure AI Search grounding + Content Safety',
+      key_differences: 'Azure provides built-in grounding with AI Search.',
+      interview_phrase: 'I mitigate hallucinations through RAG grounding, structured outputs, and confidence thresholds for human review.'
+    }
+  },
+  {
+    id: 'advanced-3',
+    question: 'How would you implement a multi-agent system for complex task automation?',
+    hints: ['Orchestration', 'Specialization', 'Communication'],
+    expected_topics: ['agents', 'orchestration', 'multi-agent'],
+    code_snippet: null,
+    options: [
+      'Use a single agent for everything',
+      'Design specialized agents (planner, executor, critic), implement an orchestration layer, use structured communication protocols, and add checkpointing for long-running tasks',
+      'Just use function calling',
+      'Agents are not needed for automation'
+    ],
+    correct_option: 1,
+    blank_answer: 'specialized agents, orchestration, structured communication',
+    topic: 'function-calling',
+    subtopic: 'tools',
+    difficulty: 'advanced',
+    bank: 'advanced',
+    azure_bridge: {
+      openai_way: 'OpenAI Agents API + custom orchestration',
+      azure_equivalent: 'Azure AI Agent Service + Semantic Kernel',
+      key_differences: 'Azure provides Semantic Kernel for agent orchestration.',
+      interview_phrase: 'I design multi-agent systems with specialized roles and use Semantic Kernel for orchestration and memory management.'
+    }
+  },
+  {
+    id: 'advanced-4',
+    question: 'How do you optimize costs for a high-volume LLM application?',
+    hints: ['Caching', 'Model selection', 'Prompt optimization'],
+    expected_topics: ['cost optimization', 'caching', 'model selection'],
+    code_snippet: null,
+    options: [
+      'Always use the cheapest model',
+      'Implement semantic caching, use model routing (smaller models for simple tasks), optimize prompts for token efficiency, batch requests, and use fine-tuned models for repetitive tasks',
+      'Reduce the number of users',
+      'Cost optimization is not possible'
+    ],
+    correct_option: 1,
+    blank_answer: 'semantic caching, model routing, prompt optimization',
+    topic: 'api-basics',
+    subtopic: 'models',
+    difficulty: 'advanced',
+    bank: 'advanced',
+    azure_bridge: {
+      openai_way: 'Caching + model routing + prompt optimization',
+      azure_equivalent: 'Azure PTU for predictable pricing + model routing',
+      key_differences: 'Azure offers Provisioned Throughput Units for cost predictability.',
+      interview_phrase: 'I reduce costs 50-70% through semantic caching, intelligent model routing, and prompt optimization.'
+    }
+  },
+  {
+    id: 'advanced-5',
+    question: 'How would you implement evaluation and monitoring for an LLM application?',
+    hints: ['Metrics', 'Logging', 'A/B testing'],
+    expected_topics: ['evaluation', 'monitoring', 'metrics'],
+    code_snippet: null,
+    options: [
+      'Just check if the API returns a response',
+      'Track latency/throughput/error rates, implement LLM-as-judge evaluation, log prompts and responses, set up A/B testing for prompt changes, and monitor for drift and quality degradation',
+      'Monitoring is not needed for LLMs',
+      'Only monitor costs'
+    ],
+    correct_option: 1,
+    blank_answer: 'latency metrics, LLM-as-judge, A/B testing, drift monitoring',
+    topic: 'api-basics',
+    subtopic: 'models',
+    difficulty: 'advanced',
+    bank: 'advanced',
+    azure_bridge: {
+      openai_way: 'Custom logging + evaluation frameworks',
+      azure_equivalent: 'Azure Monitor + AI Studio evaluation',
+      key_differences: 'Azure AI Studio provides built-in evaluation tools.',
+      interview_phrase: 'I implement comprehensive monitoring with LLM-as-judge evaluation and track quality metrics over time.'
+    }
   }
 ]
 
-// Code Sample Library - 10 Real Interview Patterns
+// Code Sample Library- 10 Real Interview Patterns
 interface CodeSample {
   id: string
   title: string
@@ -3735,9 +4113,10 @@ export default function App() {
   const [totalScore, setTotalScore] = useState(0)
   const [weakAreas, setWeakAreas] = useState<{ category: string; avgScore: number }[]>([])
   const [topicMastery, setTopicMastery] = useState<TopicMastery>({})
-  const [currentTopic, setCurrentTopic] = useState<string>('')
-  const [currentSubtopic, setCurrentSubtopic] = useState<string>('')
-  const [usedQuestionIds, setUsedQuestionIds] = useState<Set<string>>(new Set())
+    const [currentTopic, setCurrentTopic] = useState<string>('')
+    const [currentSubtopic, setCurrentSubtopic] = useState<string>('')
+    // Use ref instead of state for synchronous updates to prevent question repetition
+    const usedQuestionIdsRef = useRef<Set<string>>(new Set())
     const [userProgress, setUserProgress] = useState<UserProgress>({
       totalQuestionsAnswered: 0,
       currentStreak: 0,
@@ -3811,9 +4190,9 @@ export default function App() {
     setSessionStats({ correct: 0, total: 0, streak: 0, bestStreak: 0 })
     setTotalScore(0)
     setAvgScore(0)
-    setTimeLeft(duration * 90)
-    setUsedQuestionIds(new Set()) // Reset used questions for new session
-    setScreen('question')
+        setTimeLeft(duration * 90)
+        usedQuestionIdsRef.current = new Set() // Reset used questions for new session (sync)
+        setScreen('question')
     await generateQuestion(type)
   }
 
@@ -3853,27 +4232,29 @@ export default function App() {
     // Get available banks based on user progress (5 banks: easy, medium, hard, code_review, advanced)
     const availableBanks = getBankForProgress(userProgress)
 
-    // Use local question bank for instant loading - no API call needed
-    let availableQuestions = QUESTION_BANK.filter(q => {
-      // Must be from an available bank based on progress
-      if (!availableBanks.includes(q.bank)) return false
-      if (topic && q.topic !== topic) return false
-      if (subtopic && q.subtopic !== subtopic) return false
-      // PREVENT REPETITION: Exclude already-used questions in this session
-      if (usedQuestionIds.has(q.id)) return false
-      return true
-    })
+        // Use local question bank for instant loading - no API call needed
+        let availableQuestions = QUESTION_BANK.filter(q => {
+          // Must be from an available bank based on progress
+          if (!availableBanks.includes(q.bank)) return false
+          if (topic && q.topic !== topic) return false
+          if (subtopic && q.subtopic !== subtopic) return false
+          // PREVENT REPETITION: Exclude already-used questions in this session (using ref for sync access)
+          if (usedQuestionIdsRef.current.has(q.id)) return false
+          return true
+        })
 
-    // If no topic-specific questions, use all unused questions
-    if (availableQuestions.length === 0) {
-      availableQuestions = QUESTION_BANK.filter(q => !usedQuestionIds.has(q.id))
-    }
+        // If no topic-specific questions, use all unused questions from available banks
+        if (availableQuestions.length === 0) {
+          availableQuestions = QUESTION_BANK.filter(q => 
+            availableBanks.includes(q.bank) && !usedQuestionIdsRef.current.has(q.id)
+          )
+        }
 
-    // If all questions used, reset and allow repeats (fallback for long sessions)
-    if (availableQuestions.length === 0) {
-      setUsedQuestionIds(new Set())
-      availableQuestions = [...QUESTION_BANK]
-    }
+        // If all questions in available banks used, reset and allow repeats (fallback for long sessions)
+        if (availableQuestions.length === 0) {
+          usedQuestionIdsRef.current = new Set()
+          availableQuestions = QUESTION_BANK.filter(q => availableBanks.includes(q.bank))
+        }
 
     // ADAPTIVE LEARNING: Prioritize weak areas (70% chance to pick from weak topics if available)
     if (weakTopics.length > 0 && Math.random() < 0.7) {
@@ -3893,8 +4274,8 @@ export default function App() {
     const randomIndex = Math.floor(Math.random() * availableQuestions.length)
     const bankQuestion = availableQuestions[randomIndex]
 
-    // Track this question as used
-    setUsedQuestionIds(prev => new Set([...prev, bankQuestion.id]))
+        // Track this question as used (synchronous update via ref)
+        usedQuestionIdsRef.current.add(bankQuestion.id)
 
     // Convert bank question to the format expected by QuestionScreen
     const question: Question = {
@@ -4018,10 +4399,10 @@ export default function App() {
     setSessionStats({ correct: 0, total: 0, streak: 0, bestStreak: 0 })
     setTotalScore(0)
     setAvgScore(0)
-    setTimeLeft(20 * 90)
-    setUsedQuestionIds(new Set()) // Reset used questions for new session
-    setScreen('question')
-    generateQuestion('technical', topicId, subtopicId)
+        setTimeLeft(20 * 90)
+        usedQuestionIdsRef.current = new Set() // Reset used questions for new session (sync)
+        setScreen('question')
+        generateQuestion('technical', topicId, subtopicId)
   }
 
   const updateTopicMastery = (topicId: string, subtopicId: string, isCorrect: boolean) => {
